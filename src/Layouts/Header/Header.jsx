@@ -72,7 +72,7 @@ export default function Header() {
                             </li>
                         </div>
                     </ul>
-                    <NavLink to='/home' className='list-image-item' onClick={closeMenu}>
+                    <NavLink to='/' className='list-image-item' onClick={closeMenu}>
                         <img src={Logo} alt="" />
                     </NavLink>
                 </nav>
