@@ -199,11 +199,15 @@ header {
         
             .menu-responsive {
                 display: flex;
+                flex-direction: column;
+                gap: 30px;
                 position: fixed;
                 top: 0;
                 left: 0;
                 width: 0px;
                 height: 100dvh;
+                justify-content: center;
+                align-items: start;
                 background-color: black;
                 transition: all 0.2s ease-in-out;
                 overflow: hidden;
@@ -232,21 +236,13 @@ header {
 
             .nav-check-button:checked ~ ul {
                 opacity: 1;
-                transition: all 1s linear;
             }
     
             & ul {
-                opacity: 0;
-                flex-direction: column;
-                left: 0;
-                top: 200px;
-                align-items: start;
-                margin: 0 20px;
-                position: absolute;
-                z-index: 2;
-                transition: all 0.2s linear;
     
                 & li {
+                    margin-left: 20px;
+                    height: 30px;
     
                     .list-item {
                         color: white;
@@ -254,7 +250,6 @@ header {
                         &:hover {
                             color: var(--primary-color);
                         }
-
                     }
                     
                     .active {
@@ -263,6 +258,15 @@ header {
     
                     .list-item::after {
                         background-color: var(--primary-color);
+                    }
+                }
+
+                & div {
+                    margin-left: 20px;
+
+                    & li {
+                        margin-left: 0;
+                        height: 100%;
                     }
                 }
             }
@@ -279,6 +283,7 @@ header {
                     border-radius: 8px;
                     box-shadow: 0 0 10px var(--secondary-color);
                     transition: all 0.2s linear;
+                    box-shadow:  0 0 0 transparent;
                 }
             }
         }

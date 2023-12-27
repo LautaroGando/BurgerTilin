@@ -1,10 +1,25 @@
-import './Header.css'
-import Logo from '../../assets/icons/icon-logo.png'
-import { NavLink } from 'react-router-dom'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCartShopping, faUser, faScrewdriverWrench } from '@fortawesome/free-solid-svg-icons'
+import React, { useState } from 'react';
+import './Header.css';
+import Logo from '../../assets/icons/icon-logo.png';
+import { NavLink } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCartShopping, faUser, faScrewdriverWrench } from '@fortawesome/free-solid-svg-icons';
 
 export default function Header() {
+
+    const [isMenuOpen, setMenuOpen] = useState(false);
+
+    const handleMenuToggle = () => {
+
+        setMenuOpen(!isMenuOpen);
+
+    };
+
+    const closeMenu = () => {
+
+        setMenuOpen(false);
+
+    };
 
     return (
 
@@ -12,27 +27,34 @@ export default function Header() {
 
             <header>
                 <nav>
-                    <input className='nav-check-button' type="checkbox" name="checked" id="checked" />
+                    <input className='nav-check-button' type="checkbox" name="checked" id="checked" checked={isMenuOpen} onChange={handleMenuToggle} />
                     <label className='nav-check' htmlFor="checked">
                         <span className='burguer-line'></span>
                     </label>
-                    <div className="menu-responsive"></div>
-                    <ul>
+                    <ul className='menu-responsive'>
                         <li>
-                            <NavLink to='/menu' className='list-item'>MENU</NavLink>
+                            <NavLink to='/menu' className='list-item' onClick={closeMenu}>
+                                MENU
+                            </NavLink>
                         </li>
                         <li>
-                            <NavLink to='/about-us' className='list-item'>NOSOTROS</NavLink>
+                            <NavLink to='/about-us' className='list-item' onClick={closeMenu}>
+                                NOSOTROS
+                            </NavLink>
                         </li>
                         <li>
-                            <NavLink to='/contact' className='list-item'>CONTACTO</NavLink>
+                            <NavLink to='/contact' className='list-item' onClick={closeMenu}>
+                                CONTACTO
+                            </NavLink>
                         </li>
                         <li>
-                            <NavLink to='/login-register' className='list-item'>INGRESAR</NavLink>
+                            <NavLink to='/login-register' className='list-item' onClick={closeMenu}>
+                                INGRESAR
+                            </NavLink>
                         </li>
                         <div>
                             <li>
-                                <NavLink to='/admin'>
+                                <NavLink to='/admin' onClick={closeMenu}>
                                     <button className='admin'>
                                         <FontAwesomeIcon icon={faScrewdriverWrench} />
                                     </button>
@@ -50,7 +72,7 @@ export default function Header() {
                             </li>
                         </div>
                     </ul>
-                    <NavLink to='/home' className='list-image-item'>
+                    <NavLink to='/home' className='list-image-item' onClick={closeMenu}>
                         <img src={Logo} alt="" />
                     </NavLink>
                 </nav>
@@ -58,6 +80,6 @@ export default function Header() {
 
         </>
 
-    )
+    );
 
 }
