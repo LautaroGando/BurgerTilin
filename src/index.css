@@ -8,3 +8,8 @@
     --primary-color: #edb026;
     --secondary-color: #232323;
 }
+
+#root {
+    margin: 0;
+    padding: 0;
+}

@@ -1,14 +1,17 @@
-import { Route, Routes } from 'react-router-dom'
-import './App.css'
-import Header from './Layouts/Header/Header'
-import Home from './pages/Home/Home'
-import Menu from './pages/Menu/Menu'
-import Contact from './pages/Contact/Contact'
-import AboutUs from './pages/AboutUs/AboutUs'
-import LoginRegister from './pages/LoginRegister/LoginRegister'
-import Admin from './pages/Admin/Admin'
+import { Route, Routes } from 'react-router-dom';
+import './App.css';
+import Header from './Layouts/Header/Header';
+import Footer from './Layouts/Footer/Footer';
+import Home from './pages/Home/Home';
+import Menu from './pages/Menu/Menu';
+import Contact from './pages/Contact/Contact';
+import AboutUs from './pages/AboutUs/AboutUs';
+import LoginRegister from './pages/LoginRegister/LoginRegister';
+import Admin from './pages/Admin/Admin';
 
 function App() {
+
+    const year = new Date().getFullYear();
 
     return (
 
@@ -27,10 +30,12 @@ function App() {
                 </Routes>
             </main>
 
+            <Footer year={year}/>
+
         </>
 
-    )
+    );
 
-}
+};
 
-export default App
+export default App;

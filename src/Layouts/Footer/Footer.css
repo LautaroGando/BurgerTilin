@@ -1,0 +1,83 @@
+footer {
+    background-color: var(--secondary-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    height: 500px;
+    
+    .copy {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+    }
+
+    .contact {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: start;
+        justify-content: space-evenly;
+        border-right: 2px solid var(--primary-color);
+        height: 70%;
+
+        .phone,
+        .instagram,
+        .email {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 28px;
+
+            & a {
+                font-size: 14px;
+                color: white;
+                text-decoration: none;
+                transition: all 0.2s linear;
+
+                &:hover {
+                    color: var(--primary-color);
+                }
+            }
+
+            & path {
+                transition: all 0.2s linear;
+            }
+
+            & path:hover {
+                color: var(--primary-color);
+            }
+        }
+    }
+
+    .img-logo {
+        display: flex;
+        justify-content: center;
+        flex: 1;
+        
+        & img {
+            width: 300px;
+        }
+    }
+}
+
+@media screen and (max-width: 768px) {
+    
+    footer {
+        flex-direction: column;
+        
+        .copy {
+            align-items: center;
+        }
+    
+        .contact {
+            border-right: none;
+            border-bottom: 2px solid var(--primary-color);
+        }
+    
+        .img-logo {
+            align-items: center;
+        }
+    }
+
+}
