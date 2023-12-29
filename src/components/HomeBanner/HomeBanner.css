@@ -1,15 +1,15 @@
 .banner {
     width: 100%;
-    height: calc(100vh - 300px);
+    height: calc(100dvh - 300px);
     object-fit: cover;
     object-position: bottom;
 }
 
 .look-menu {
-    width: 700px;
+    width: 100%;
     height: 80px;
     position: absolute;
-    top: 80%;
+    top: calc(100% - 80px);
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -20,7 +20,6 @@
     font-size: 50px;
     background-color: rgba(0, 0, 0, 0.432);
     padding: 15px;
-    border-radius: 30px;
     backdrop-filter: blur(5px);
     cursor: pointer;
     transition: all 0.2s linear;
@@ -31,7 +30,6 @@
         height: 100%;
         position: absolute;
         background-color: var(--primary-color);
-        border-radius: 30px;
         color: var(--secondary-color);
         z-index: -1;
         transition: all 0.2s linear;
@@ -60,7 +58,7 @@
 @media screen and (max-width: 768px) {
     
     .look-menu {
-        width: 300px;
+        top: calc(100% - 60px);
         height: 60px;
         font-size: 20px;
         
