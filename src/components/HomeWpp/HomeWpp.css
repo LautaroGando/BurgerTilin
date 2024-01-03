@@ -1,0 +1,23 @@
+.wppLink {
+    width: 70px;
+    height: 70px;
+    position: fixed;
+    background-color: var(--primary-color);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 45px;
+    color: var(--secondary-color);
+    bottom: 10px;
+    right: 10px;
+    border: 2px solid var(--secondary-color);
+    transition: all 0.2s linear;
+
+    &:hover {
+        background-color: var(--secondary-color);
+        color: var(--primary-color);
+        border: 2px solid var(--primary-color);
+        box-shadow: 0 0 10px var(--primary-color);
+    }
+}

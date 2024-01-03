@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './Header.css';
+import SignIn from '../../components/SignIn/SignIn';
 import Logo from '../../assets/icons/icon-logo.png';
 import { NavLink } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -48,9 +49,7 @@ export default function Header() {
                             </NavLink>
                         </li>
                         <li>
-                            <NavLink to='/login-register' className='list-item' onClick={closeMenu}>
-                                INGRESAR
-                            </NavLink>
+                            <SignIn />
                         </li>
                         <div>
                             <li>

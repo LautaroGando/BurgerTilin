@@ -9,6 +9,25 @@
     --secondary-color: #232323;
 }
 
+::-webkit-scrollbar {
+    background-color: var(--primary-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--secondary-color);
+}
+
+::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    filter: invert(0);
+    background-color: #edb026;
+}
+
+::selection {
+    color: var(--secondary-color);
+    background-color: var(--primary-color);
+}
+
 #root {
     margin: 0;
     padding: 0;

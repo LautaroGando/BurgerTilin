@@ -1,4 +1,6 @@
 import HomeBanner from "../../components/HomeBanner/HomeBanner"
+import HomeInfo from "../../components/HomeInfo/HomeInfo"
+import HomeWpp from "../../components/HomeWpp/HomeWpp"
 
 export default function Home() {
 
@@ -7,6 +9,10 @@ export default function Home() {
         <>
 
             <HomeBanner />
+
+            <HomeInfo sendFree="10.000"/>
+
+            <HomeWpp />
 
         </>
 

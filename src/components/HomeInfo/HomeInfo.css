@@ -1,0 +1,59 @@
+.info-flex {
+    display: flex;
+    height: 400px;
+
+    .send, 
+    .cashout,
+    .info {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        gap: 10px;
+        font-size: 12px;
+
+        & svg {
+            font-size: 30px;
+        }
+    }
+
+    .send,
+    .info {
+        background-color: var(--primary-color);
+        color: var(--secondary-color);
+    }
+
+    .cashout {
+        background-color: var(--secondary-color);
+        color: var(--primary-color);
+    } 
+}
+
+@media screen and (max-width: 1000px) {
+    
+    .info-flex {
+    
+        .send, 
+        .cashout,
+        .info {
+            font-size: 9px;
+        }
+    }
+
+}
+
+@media screen and (max-width: 768px) {
+    
+    .info-flex {
+        flex-direction: column;
+        height: auto;
+    
+        .send, 
+        .cashout,
+        .info {
+            height: 350px;
+        }
+    }
+
+}

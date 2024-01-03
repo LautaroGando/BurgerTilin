@@ -1,0 +1,14 @@
+.btn {
+    padding: 0.35rem 0.75rem !important;
+    background-color: var(--secondary-color) !important;
+    color: var(--primary-color) !important;
+}
+
+.btn:hover {
+    background-color: var(--secondary-color) !important;
+    color: white !important;
+}
+
+.btn:active {
+    background-color: transparent !important;
+}
