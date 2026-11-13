@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+}
+enum Role {
+  OWNER
+  CASHIER
+  KITCHEN
+}
+enum OrderStatus {
+  NEW
+  ACCEPTED
+  PREPARING
+  READY
+  DISPATCHED
+  DELIVERED
+  REJECTED
+  CANCELLED
+}
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  password String
+  role Role
+  active Boolean @default(true)
+  sessions Session[]
+}
+model Session {
+  token String @id
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  expiresAt DateTime
+}
+model Settings {
+  id Int @id @default(1)
+  data Json
+}
+model Product {
+  id String @id @default(cuid())
+  name String
+  category String
+  description String @default("")
+  image String @default("")
+  price Int?
+  published Boolean @default(false)
+  soldOut Boolean @default(false)
+  favorite Boolean @default(false)
+  archivedAt DateTime?
+  config Json
+  updatedAt DateTime @updatedAt
+}
+model Ingredient {
+  id String @id @default(cuid())
+  name String
+  unit String
+  stock Int @default(0)
+  reserved Int @default(0)
+  minimum Int @default(0)
+  strict Boolean @default(false)
+  cost Decimal? @db.Decimal(16,6)
+  archivedAt DateTime?
+  movements StockMovement[]
+  reservations Reservation[]
+}
+model StockMovement {
+  id String @id @default(cuid())
+  ingredientId String
+  ingredient Ingredient @relation(fields:[ingredientId],references:[id])
+  quantity Int
+  kind String
+  reason String
+  orderId String?
+  createdAt DateTime @default(now())
+}
+model Customer {
+  id String @id @default(cuid())
+  phone String @unique
+  name String
+  orders Order[]
+}
+model Order {
+  id String @id @default(cuid())
+  number Int @unique @default(autoincrement())
+  key String @unique
+  requestHash String
+  trackingHash String @unique
+  trackingSecret String
+  status OrderStatus @default(NEW)
+  paymentStatus String @default("PENDING")
+  channel String
+  fulfillment String
+  customerId String?
+  customer Customer? @relation(fields:[customerId],references:[id])
+  customerName String
+  phone String
+  address String @default("")
+  zone String @default("")
+  notes String @default("")
+  rider String @default("")
+  items Json
+  subtotal Int
+  discount Int @default(0)
+  shipping Int @default(0)
+  total Int
+  commission Int @default(0)
+  ingredientCost Int?
+  estimatedMinutes Int
+  consumed Boolean @default(false)
+  acknowledgedAt DateTime?
+  archivedAt DateTime?
+  shiftId String?
+  shift Shift? @relation(fields:[shiftId],references:[id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  reservations Reservation[]
+  payments Payment[]
+  onlineCheckout OnlineCheckout?
+  @@index([createdAt])
+  @@index([status])
+}
+model OnlineCheckout {
+  orderId String @id
+  order Order @relation(fields:[orderId],references:[id],onDelete:Cascade)
+  providerId String? @unique
+  checkoutUrl String?
+  checkedAt DateTime?
+  @@index([checkedAt])
+}
+model Reservation {
+  id String @id @default(cuid())
+  orderId String
+  order Order @relation(fields:[orderId],references:[id])
+  ingredientId String
+  ingredient Ingredient @relation(fields:[ingredientId],references:[id])
+  quantity Int
+  released Boolean @default(false)
+  @@unique([orderId,ingredientId])
+}
+model Payment {
+  id String @id @default(cuid())
+  key String @unique
+  orderId String
+  order Order @relation(fields:[orderId],references:[id])
+  method String
+  cash Boolean @default(false)
+  receivable Boolean @default(false)
+  settlementId String?
+  settlement Settlement? @relation(fields:[settlementId],references:[id])
+  amount Int
+  fee Int
+  status String
+  confirmedAt DateTime?
+  shiftId String?
+  shift Shift? @relation(fields:[shiftId],references:[id])
+  createdAt DateTime @default(now())
+}
+model Shift {
+  id String @id @default(cuid())
+  openedAt DateTime @default(now())
+  closedAt DateTime?
+  opening Int
+  counted Int?
+  expected Int?
+  difference Int?
+  orders Order[]
+  payments Payment[]
+  entries CashEntry[]
+  settlements Settlement[]
+}
+model Settlement {
+  id String @id @default(cuid())
+  key String @unique
+  channel String
+  amount Int
+  method String
+  cash Boolean
+  reference String
+  shiftId String
+  shift Shift @relation(fields:[shiftId],references:[id])
+  payments Payment[]
+  createdAt DateTime @default(now())
+}
+model CashEntry {
+  id String @id @default(cuid())
+  key String @unique
+  shiftId String
+  shift Shift @relation(fields:[shiftId],references:[id])
+  amount Int
+  category String
+  method String
+  cash Boolean @default(false)
+  note String
+  createdAt DateTime @default(now())
+}
+model Audit {
+  id String @id @default(cuid())
+  actor String
+  action String
+  entity String
+  data Json
+  createdAt DateTime @default(now())
+}
+model Media {
+  id String @id
+  name String
+  width Int
+  height Int
+  content Bytes?
+  createdAt DateTime @default(now())
+}

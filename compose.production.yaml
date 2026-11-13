@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: burger_tilin
+      POSTGRES_USER: tilin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: ['pgdata:/var/lib/postgresql']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U tilin -d burger_tilin']
+      interval: 5s
+      retries: 10
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL using db as host}
+      WEB_ORIGIN: ${WEB_ORIGIN:?Set HTTPS public origin}
+      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
+      MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET:-}
+      MP_SELLER_ID: ${MP_SELLER_ID:-}
+      MP_FEE_BPS: ${MP_FEE_BPS:-0}
+      TRUST_PROXY: 'true'
+      UPLOAD_DIR: /app/uploads
+    volumes: ['uploads:/app/uploads']
+    depends_on:
+      db: { condition: service_healthy }
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    restart: unless-stopped
+    depends_on: [api]
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?Set public hostname}
+    ports: ['80:80', '443:443']
+    volumes:
+      ['./deploy/Caddyfile:/etc/caddy/Caddyfile:ro', 'caddy_data:/data', 'caddy_config:/config']
+    depends_on: [api, web]
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+  uploads:

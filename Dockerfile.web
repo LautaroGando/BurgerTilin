@@ -1,0 +1,14 @@
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY package*.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
+RUN npm ci
+COPY apps/web apps/web
+ENV API_INTERNAL_URL=http://api:4000 NEXT_TELEMETRY_DISABLED=1
+RUN npm run build -w apps/web && chown -R node:node /app/apps/web/.next
+ENV NODE_ENV=production
+USER node
+WORKDIR /app/apps/web
+EXPOSE 3000
+CMD ["npm", "start"]

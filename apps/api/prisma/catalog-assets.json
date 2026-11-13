@@ -1,0 +1,149 @@
+[
+  {
+    "name": "Papas fritas doradas en caja-14",
+    "category": "Papas",
+    "image": "/assets/Papas Fritas/Papas fritas doradas en caja-14.png"
+  },
+  {
+    "name": "Cuarto Tilín Doble",
+    "category": "Hamburguesas",
+    "image": "/assets/Hamburguesas/Cuarto Tilín Doble.png"
+  },
+  {
+    "name": "Cuarto Tilín",
+    "category": "Hamburguesas",
+    "image": "/assets/Hamburguesas/Cuarto Tilín.png"
+  },
+  {
+    "name": "Onion Tilín Doble",
+    "category": "Hamburguesas",
+    "image": "/assets/Hamburguesas/Onion Tilín Doble.png"
+  },
+  {
+    "name": "Onion Tilín",
+    "category": "Hamburguesas",
+    "image": "/assets/Hamburguesas/Onion Tilín.png"
+  },
+  {
+    "name": "Tilín Americana Doble",
+    "category": "Hamburguesas",
+    "image": "/assets/Hamburguesas/Tilín Americana Doble.png"
+  },
+  {
+    "name": "Tilín Americana",
+    "category": "Hamburguesas",
+    "image": "/assets/Hamburguesas/Tilín Americana.png"
+  },
+  {
+    "name": "Tilín Doble",
+    "category": "Hamburguesas",
+    "image": "/assets/Hamburguesas/Tilín Doble.png"
+  },
+  {
+    "name": "Tilín Fortinera Doble",
+    "category": "Hamburguesas",
+    "image": "/assets/Hamburguesas/Tilín Fortinera Doble.png"
+  },
+  {
+    "name": "Tilín Fortinera",
+    "category": "Hamburguesas",
+    "image": "/assets/Hamburguesas/Tilín Fortinera.png"
+  },
+  {
+    "name": "Tilín",
+    "category": "Hamburguesas",
+    "image": "/assets/Hamburguesas/Tilín.png"
+  },
+  {
+    "name": "Promo 2 Fortineras Dobles",
+    "category": "Promociones",
+    "image": "/assets/Promos para compartir/Promo 2 Fortineras Dobles.png"
+  },
+  {
+    "name": "Promo Americana + Onion Dobles",
+    "category": "Promociones",
+    "image": "/assets/Promos para compartir/Promo Americana + Onion Dobles.png"
+  },
+  {
+    "name": "Promo Familiar",
+    "category": "Promociones",
+    "image": "/assets/Promos para compartir/Promo Familiar.png"
+  },
+  {
+    "name": "Botella Coca",
+    "category": "Bebidas",
+    "image": "/assets/Bebidas/Botella Coca.png"
+  },
+  {
+    "name": "Botella Sprite",
+    "category": "Bebidas",
+    "image": "/assets/Bebidas/Botella Sprite.png",
+    "seed": false
+  },
+  {
+    "name": "Lata Coca",
+    "category": "Bebidas",
+    "image": "/assets/Bebidas/Lata Coca.png"
+  },
+  {
+    "name": "Lata Pepsi",
+    "category": "Bebidas",
+    "image": "/assets/Bebidas/Lata Pepsi.png"
+  },
+  {
+    "name": "Lata Quilmes",
+    "category": "Bebidas",
+    "image": "/assets/Bebidas/Lata Quilmes.png",
+    "seed": false
+  },
+  {
+    "name": "Combo Cuarto Tilín Doble",
+    "category": "Combos",
+    "image": "/assets/Combos/Combo Cuarto Tilín Doble.png"
+  },
+  {
+    "name": "Combo Cuarto Tilín",
+    "category": "Combos",
+    "image": "/assets/Combos/Combo Cuarto Tilín.png"
+  },
+  {
+    "name": "Combo Onion Tilín Doble",
+    "category": "Combos",
+    "image": "/assets/Combos/Combo Onion Tilín Doble.png"
+  },
+  {
+    "name": "Combo Onion Tilín",
+    "category": "Combos",
+    "image": "/assets/Combos/Combo Onion Tilín.png"
+  },
+  {
+    "name": "Combo Tilín Americana Doble",
+    "category": "Combos",
+    "image": "/assets/Combos/Combo Tilín Americana Doble.png"
+  },
+  {
+    "name": "Combo Tilín Americana",
+    "category": "Combos",
+    "image": "/assets/Combos/Combo Tilín Americana.png"
+  },
+  {
+    "name": "Combo Tilín Doble",
+    "category": "Combos",
+    "image": "/assets/Combos/Combo Tilín Doble.png"
+  },
+  {
+    "name": "Combo Tilín Fortinera Doble",
+    "category": "Combos",
+    "image": "/assets/Combos/Combo Tilín Fortinera Doble.png"
+  },
+  {
+    "name": "Combo Tilín Fortinera",
+    "category": "Combos",
+    "image": "/assets/Combos/Combo Tilín Fortinera.png"
+  },
+  {
+    "name": "Combo Tilín",
+    "category": "Combos",
+    "image": "/assets/Combos/Combo Tilín.png"
+  }
+]

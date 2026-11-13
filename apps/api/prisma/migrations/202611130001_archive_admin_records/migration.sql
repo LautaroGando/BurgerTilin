@@ -1,0 +1,3 @@
+ALTER TABLE "Product" ADD COLUMN "archivedAt" TIMESTAMP(3);
+ALTER TABLE "Ingredient" ADD COLUMN "archivedAt" TIMESTAMP(3);
+ALTER TABLE "Order" ADD COLUMN "archivedAt" TIMESTAMP(3);

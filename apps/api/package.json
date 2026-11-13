@@ -1,0 +1,49 @@
+{
+  "name": "@tilin/api",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "build:vercel": "node scripts/generate-client.cjs && npm run build",
+    "start": "node dist/main.js",
+    "test": "tsx --test test/*.test.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:embed-media": "tsx scripts/embed-media.ts",
+    "test:integration": "tsx --test test/integration.test.ts",
+    "setup": "tsx scripts/setup.ts",
+    "backup": "tsx scripts/backup.ts backup",
+    "production:export": "tsx scripts/export-production.ts",
+    "restore": "tsx scripts/backup.ts restore",
+    "account:recover": "tsx scripts/setup.ts --recover"
+  },
+  "dependencies": {
+    "@nestjs/common": "11.2.7",
+    "@nestjs/core": "11.2.7",
+    "@nestjs/platform-express": "11.2.7",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "cookie-parser": "1.4.7",
+    "dotenv": "17.2.3",
+    "helmet": "8.1.0",
+    "luxon": "3.7.2",
+    "multer": "^2.5.0",
+    "pg": "8.16.3",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "sharp": "^0.35.5",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "1.4.10",
+    "@types/express": "5.0.5",
+    "@types/luxon": "3.7.1",
+    "@types/multer": "^2.0.0",
+    "@types/node": "24.10.1",
+    "@types/pg": "8.15.6",
+    "prisma": "7.10.1",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  }
+}

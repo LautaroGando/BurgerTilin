@@ -1,0 +1,15 @@
+import type { Metadata } from 'next';
+import './globals.css';
+export const metadata: Metadata = {
+  title: 'Burger Tilín · Hechas al momento',
+  description: 'Tu próxima burger, recién hecha. Pedí en Burger Tilín.',
+  robots: { index: false, follow: false },
+  referrer: 'no-referrer',
+};
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="es-AR">
+      <body>{children}</body>
+    </html>
+  );
+}

@@ -1,0 +1,16 @@
+FROM node:24-bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY package*.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
+RUN npm ci
+COPY apps/api apps/api
+# Generate requires a URL syntactically; no connection or credentials are used at build time.
+RUN DATABASE_URL=postgresql://localhost/build npm run db:generate && npm run build -w apps/api
+ENV NODE_ENV=production API_HOST=0.0.0.0 PORT=4000
+RUN mkdir -p /app/uploads && chown node:node /app/uploads
+USER node
+WORKDIR /app/apps/api
+EXPOSE 4000
+CMD ["npm", "start"]
