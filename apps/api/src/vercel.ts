@@ -1,3 +1,1 @@
-import { bootstrap } from './main';
-
-void bootstrap();
+export { default } from './main';

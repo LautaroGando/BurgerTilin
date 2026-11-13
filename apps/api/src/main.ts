@@ -32,7 +32,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { interval, map, merge } from 'rxjs';
-import { Db } from './db';
+import { databaseUrl, Db } from './db';
 import { Catalog } from './catalog';
 import { Orders, audit } from './orders';
 import { Finance } from './finance';
@@ -465,11 +465,9 @@ class Api {
   ],
 })
 class App {}
-export async function bootstrap(port = Number(process.env.PORT || 4000)) {
+async function createApp() {
   const hosted = process.env.VERCEL === '1';
-  const databaseReady = hosted
-    ? Boolean(process.env.TILIN_DATABASE_URL_POOLED || process.env.TILIN_DATABASE_URL)
-    : Boolean(process.env.DATABASE_URL);
+  const databaseReady = Boolean(databaseUrl());
   if (!hosted && !databaseReady) throw new Error('Falta DATABASE_URL');
   const app = await NestFactory.create<NestExpressApplication>(App, {
     logger: ['error', 'warn', 'log'],
@@ -532,7 +530,25 @@ export async function bootstrap(port = Number(process.env.PORT || 4000)) {
     next();
   });
   app.useGlobalFilters(new Errors());
-  await app.listen(port, hosted ? '0.0.0.0' : process.env.API_HOST || '127.0.0.1');
   return app;
 }
-if (require.main === module) bootstrap();
+
+export async function bootstrap(port = Number(process.env.PORT || 4000)) {
+  const app = await createApp();
+  await app.listen(port, process.env.API_HOST || '127.0.0.1');
+  return app;
+}
+
+let vercelApp: Promise<NestExpressApplication> | undefined;
+export default async function handler(req: Request, res: Response) {
+  vercelApp ??= createApp()
+    .then((app) => app.init())
+    .catch((error) => {
+      vercelApp = undefined;
+      throw error;
+    });
+  const app = await vercelApp;
+  app.getHttpAdapter().getInstance()(req, res);
+}
+
+if (process.env.VERCEL !== '1' && require.main === module) bootstrap();
