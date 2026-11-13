@@ -22,6 +22,12 @@ import { api, money, Product, CartLine } from '../lib/api';
 import { Brand, Modal, Empty, Field, ErrorBox, Loading, Toggle } from './ui';
 import DeliveryMap from './delivery-map';
 
+const menuCategories = ['Promociones', 'Combos', 'Hamburguesas', 'Papas', 'Bebidas'];
+const menuCategoryRank = (category: string) => {
+  const index = menuCategories.indexOf(category);
+  return index === -1 ? menuCategories.length : index;
+};
+
 const blankChoice = (id: string) => ({ productId: id, extras: [], remove: [] });
 const paymentIcons = new Map([
   ['cash', Banknote],
@@ -584,7 +590,9 @@ export default function Shop() {
         {error ? <ErrorBox message={error} /> : <Loading />}
       </>
     );
-  const products = data.products as Product[];
+  const products = [...(data.products as Product[])].sort(
+    (a, b) => menuCategoryRank(a.category) - menuCategoryRank(b.category),
+  );
   const cats = ['Todos', ...new Set(products.map((p) => p.category))];
   const filtered = products.filter(
     (p) =>
