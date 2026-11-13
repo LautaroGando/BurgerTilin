@@ -246,7 +246,9 @@ export class Catalog {
     const showCosts = !publicView && includeCosts;
     const online =
       showCosts && !archived && process.env.MP_FEE_BPS?.trim() ? mercadoPagoConfig() : undefined;
-    const webChannel = online && (await this.settings()).channels.find((c) => c.id === 'WEB');
+    const channels = showCosts ? (await this.settings()).channels : [];
+    const webChannel = channels.find((c) => c.id === 'WEB');
+    const appsChannel = channels.find((c) => c.id === 'APPS');
     if (showCosts && archived) {
       const componentIds = new Set(
         products.flatMap((p) =>
@@ -284,18 +286,24 @@ export class Catalog {
       const c = productConfig.parse(p.config);
       const baseCost = showCosts ? baseProductCost(c, byId, stock) : undefined;
       let onlineMargin: number | undefined;
-      if (online && webChannel && baseCost?.ingredientCost != null && p.price !== null) {
+      let appsMargin: number | undefined;
+      if (baseCost?.ingredientCost != null && p.price !== null) {
         const webPrice = (c.channelPrices.WEB ?? p.price) + baseCost.priceDelta;
-        if (webPrice > 0) {
+        if (online && webChannel && webPrice > 0) {
           const paymentFee = Math.round((webPrice * online.feeBps) / 10000);
           const channelFee = Math.round((webPrice * webChannel.feeBps) / 10000);
           onlineMargin = webPrice - baseCost.ingredientCost - paymentFee - channelFee;
+        }
+        const appsPrice = (c.channelPrices.APPS ?? p.price) + baseCost.priceDelta;
+        if (appsChannel && appsPrice >= 0) {
+          const channelFee = Math.round((appsPrice * appsChannel.feeBps) / 10000);
+          appsMargin = appsPrice - baseCost.ingredientCost - channelFee;
         }
       }
       return {
         ...p,
         available: available(p),
-        ...(baseCost ? { baseCost: { ...baseCost, onlineMargin } } : {}),
+        ...(baseCost ? { baseCost: { ...baseCost, onlineMargin, appsMargin } } : {}),
         config: publicView
           ? {
               ...c,

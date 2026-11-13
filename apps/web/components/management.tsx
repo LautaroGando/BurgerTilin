@@ -571,7 +571,12 @@ export function JsonField({ value, onChange }: { value: any; onChange: (v: any) 
   );
 }
 type ManagedProduct = Product & {
-  baseCost?: { ingredientCost: number | null; priceDelta: number; onlineMargin?: number };
+  baseCost?: {
+    ingredientCost: number | null;
+    priceDelta: number;
+    onlineMargin?: number;
+    appsMargin?: number;
+  };
 };
 
 export function ProductsView({ role }: { role: string }) {
@@ -610,7 +615,7 @@ export function ProductsView({ role }: { role: string }) {
           <h1>Productos.</h1>
           <p className="muted">
             {showCosts
-              ? 'El margen principal usa el precio general y el costo de la receta base. En combos se usan las opciones iniciales. Si figura Mercado Pago, esa cifra descuenta las comisiones estimadas de la venta web.'
+              ? 'El margen principal usa el precio general y la receta base. En combos se usan las opciones iniciales. Para Apps y Mercado Pago se usa el precio del canal y se descuentan las comisiones configuradas.'
               : 'Disponibilidad al toque. Datos comerciales bajo tu control.'}
           </p>
         </div>
@@ -701,6 +706,9 @@ export function ProductsView({ role }: { role: string }) {
                         {margin === null ? '—' : <b>{money(margin)}</b>}
                         {p.baseCost?.onlineMargin !== undefined && (
                           <small>Con Mercado Pago: {money(p.baseCost.onlineMargin)}</small>
+                        )}
+                        {p.baseCost?.appsMargin !== undefined && (
+                          <small>En Apps: {money(p.baseCost.appsMargin)}</small>
                         )}
                       </td>
                     )}
