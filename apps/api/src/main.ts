@@ -45,6 +45,7 @@ import { MediaService, mediaUploadLimit } from './media';
 import { MercadoPago } from './mercado-pago';
 import { mercadoPagoConfig, onlineMethod, reservedPaymentMethod } from './mercado-pago-client';
 import { OrderPush, pushEndpoint } from './order-push';
+import { OrderWhatsApp } from './order-whatsapp';
 type AuthRequest = Request & { user: { id: string; role: string; email: string } };
 const staff = ['OWNER', 'CASHIER', 'KITCHEN'],
   cash = ['OWNER', 'CASHIER'];
@@ -492,6 +493,7 @@ class Api {
     MediaService,
     MercadoPago,
     OrderPush,
+    OrderWhatsApp,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
 })

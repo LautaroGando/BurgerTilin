@@ -11,6 +11,7 @@ import type { Prisma } from '@prisma/client';
 import { generateVAPIDKeys, sendNotification } from 'web-push';
 import { z } from 'zod';
 import { Db } from './db';
+import { OrderWhatsApp, queueOrderWhatsApp } from './order-whatsapp';
 
 const lifetime = 10 * 60_000;
 const batchSize = 20;
@@ -44,12 +45,13 @@ const subscription = z.object({
   }),
 });
 
-export async function queueOrderPush(tx: Prisma.TransactionClient, orderId: string) {
+export async function queueOrderAlerts(tx: Prisma.TransactionClient, orderId: string) {
+  const whatsappQueued = await queueOrderWhatsApp(tx, orderId);
   const devices = await tx.pushDevice.findMany({
     where: { user: { active: true } },
     select: { endpoint: true },
   });
-  if (!devices.length) return false;
+  if (!devices.length) return whatsappQueued;
   await tx.pushDelivery.createMany({
     data: devices.map(({ endpoint }) => ({ orderId, endpoint })),
     skipDuplicates: true,
@@ -62,7 +64,10 @@ export class OrderPush implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OrderPush.name);
   private timer?: NodeJS.Timeout;
 
-  constructor(@Inject(Db) private db: Db) {}
+  constructor(
+    @Inject(Db) private db: Db,
+    @Inject(OrderWhatsApp) private whatsapp: OrderWhatsApp,
+  ) {}
 
   onModuleInit() {
     if (process.env.VERCEL !== '1') this.timer = setInterval(() => void this.deliver(), 60_000);
@@ -159,6 +164,10 @@ export class OrderPush implements OnModuleInit, OnModuleDestroy {
   }
 
   async deliver(orderId?: string) {
+    await Promise.all([this.deliverPush(orderId), this.whatsapp.deliver(orderId)]);
+  }
+
+  private async deliverPush(orderId?: string) {
     try {
       const now = new Date();
       const cutoff = new Date(now.getTime() - lifetime);

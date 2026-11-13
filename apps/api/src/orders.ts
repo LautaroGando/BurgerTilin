@@ -14,7 +14,7 @@ import { Catalog } from './catalog';
 import { hash } from './auth';
 import { activeChannel, opening, orderInput, phoneKey, transitions, integerMoney } from './domain';
 import { atomic } from './transactions';
-import { OrderPush, queueOrderPush } from './order-push';
+import { OrderPush, queueOrderAlerts } from './order-push';
 import {
   mercadoPagoConfig,
   onlineMethod,
@@ -149,7 +149,7 @@ export class Orders {
         channel: channel.id,
         total,
       });
-      const queued = Boolean(!actor && !online && this.push && await queueOrderPush(tx, created.id));
+      const queued = Boolean(!actor && !online && this.push && await queueOrderAlerts(tx, created.id));
       return { order: created, queued };
     });
     this.notify();

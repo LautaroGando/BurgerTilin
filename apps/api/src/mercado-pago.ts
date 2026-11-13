@@ -15,7 +15,7 @@ import { Db } from './db';
 import { hash } from './auth';
 import { audit, Orders } from './orders';
 import { atomic } from './transactions';
-import { OrderPush, queueOrderPush } from './order-push';
+import { OrderPush, queueOrderAlerts } from './order-push';
 import {
   mercadoPagoConfig,
   mercadoPagoRequest,
@@ -237,7 +237,7 @@ export class MercadoPago implements OnModuleInit, OnModuleDestroy {
         updated = true;
       }
       if (!refunds.length) {
-        if (updated && order.status === 'NEW' && order.channel === 'WEB' && await queueOrderPush(tx, order.id)) {
+        if (updated && order.status === 'NEW' && order.channel === 'WEB' && await queueOrderAlerts(tx, order.id)) {
           return order.id;
         }
         return updated;

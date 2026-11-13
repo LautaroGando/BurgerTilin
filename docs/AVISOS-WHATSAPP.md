@@ -1,0 +1,10 @@
+# Avisos de pedidos por WhatsApp
+
+Tilín Admin puede enviar un aviso al WhatsApp personal del dueño al recibir un pedido del menú. Si se paga con Mercado Pago, el envío se encola cuando se acredita el pago. El aviso contiene el número de pedido y el enlace al administrador, donde sigue haciendo falta iniciar sesión.
+
+1. Registrá un número emisor de Burger Tilín en [WhatsApp Business Platform](https://developers.facebook.com/documentation/business-messaging/whatsapp/overview). El número emisor y el WhatsApp personal de destino tienen que ser distintos.
+2. Creá y enviá a revisión la plantilla `tilin_nuevo_pedido` en español de Argentina, con una variable posicional en el cuerpo. Texto sugerido: `Burger Tilín recibió un pedido nuevo. Pedido #{{1}}. Entrá a https://burgertilin.com/admin para verlo.` Usá `25` como ejemplo para la variable. Meta determina la categoría y la aprobación. Consultá el [precio por mensaje](https://business.whatsapp.com/products/platform-pricing).
+3. En Vercel, en el entorno **Production**, configurá `WHATSAPP_ORDER_TOKEN` como secreto, con permiso de mensajería para el número emisor. Agregá `WHATSAPP_ORDER_PHONE_NUMBER_ID` con el identificador numérico que muestra Meta y `WHATSAPP_ORDER_RECIPIENT` con el WhatsApp personal en formato internacional, solo dígitos. Si el nombre o idioma de la plantilla aprobada difieren de los sugeridos, configurá `WHATSAPP_ORDER_TEMPLATE` y `WHATSAPP_ORDER_LANGUAGE` para que coincidan.
+4. Aplicá `npm run db:migrate` a la base de producción y desplegá el backend. Probá primero con el número de prueba de Meta y un destinatario verificado. Después, con el emisor definitivo, verificá que un pedido de prueba llegue al WhatsApp personal.
+
+Cada pedido tiene un solo registro de envío. El proceso programado existente reintenta los rechazos por límite de envío. Si Meta tarda demasiado o devuelve un resultado ambiguo, el sistema evita reenviar automáticamente y registra `UNCERTAIN`. `ACCEPTED` indica que Meta aceptó el mensaje para su procesamiento. La confirmación final se hace en el teléfono.

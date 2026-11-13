@@ -581,6 +581,11 @@ test(
         MP_WEBHOOK_SECRET: 'test-secret',
         MP_SELLER_ID: '123456',
         WEB_ORIGIN: 'https://tilin.example.test',
+        WHATSAPP_ORDER_TOKEN: 'whatsapp-test-token',
+        WHATSAPP_ORDER_PHONE_NUMBER_ID: '12345',
+        WHATSAPP_ORDER_RECIPIENT: '5491100000000',
+        WHATSAPP_ORDER_TEMPLATE: 'tilin_nuevo_pedido',
+        WHATSAPP_ORDER_LANGUAGE: 'es_AR',
       };
       const originalEnv = Object.entries(paymentEnv).map(
         ([key]) => [key, process.env[key]] as const,
@@ -602,9 +607,21 @@ test(
       const onlineOrder = { ...input(), method: 'mercadopago_online' };
       let creations = 0;
       let checks = 0;
+      const whatsappOrders: string[] = [];
+      let whatsappRateLimited = false;
       Object.assign(process.env, paymentEnv);
       globalThis.fetch = async (resource, options) => {
         const target = String(resource);
+        if (target === 'https://graph.facebook.com/v27.0/12345/messages') {
+          assert.equal(new Headers(options?.headers).get('Authorization'), 'Bearer whatsapp-test-token');
+          const message = JSON.parse(String(options?.body));
+          assert.equal(message.to, '5491100000000');
+          assert.equal(message.template.name, 'tilin_nuevo_pedido');
+          assert.deepEqual(Object.keys(message).sort(), ['messaging_product', 'template', 'to', 'type']);
+          whatsappOrders.push(message.template.components[0].parameters[0].text);
+          if (whatsappRateLimited) return new Response(null, { status: 429 });
+          return Response.json({ messages: [{ id: 'wamid.test' }] });
+        }
         if (!target.startsWith('https://api.mercadopago.com/'))
           return originalFetch(resource, options);
         assert.equal(new Headers(options?.headers).get('Authorization'), 'Bearer test-token');
@@ -648,6 +665,7 @@ test(
         const pending = await create.json();
         assert.equal(pending.checkoutUrl, null);
         assert.equal((await o.tracking(pending.tracking)).paymentStatus, 'PENDING');
+        assert.deepEqual(whatsappOrders, []);
         assert.equal(await d.pushDelivery.count({ where: { orderId: pending.id } }), 0);
         const retry = await fetch(url + `/tracking/${pending.tracking}/mercado-pago`, {
           method: 'POST',
@@ -695,6 +713,8 @@ test(
         assert.equal((await webhook()).status, 201);
         assert.equal((await webhook()).status, 201);
         assert.equal((await o.tracking(pending.tracking)).paymentStatus, 'PAID');
+        assert.deepEqual(whatsappOrders, [String(pending.number)]);
+        assert.equal((await d.whatsAppDelivery.findUniqueOrThrow({ where: { orderId: pending.id } })).status, 'ACCEPTED');
         assert.equal(sent.filter((tag) => tag === 'pedido-' + pending.number).length, 1);
         assert.equal(await d.pushDelivery.count({ where: { orderId: pending.id, sentAt: { not: null } } }), 1);
         assert.ok((await o.active()).some((item) => item.id === pending.id));
@@ -725,6 +745,22 @@ test(
           await d.reservation.count({ where: { orderId: pending.id, released: false } }),
           0,
         );
+        const cash = input();
+        whatsappRateLimited = true;
+        const cashResponse = await fetch(url + '/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cash),
+        });
+        assert.equal(cashResponse.status, 201);
+        const order = await cashResponse.json();
+        const where = { orderId: order.id };
+        assert.equal((await d.whatsAppDelivery.findUniqueOrThrow({ where })).status, 'PENDING');
+        await d.whatsAppDelivery.update({ where, data: { nextAttemptAt: new Date() } });
+        whatsappRateLimited = false;
+        await Promise.all([orderPush.deliver(order.id), orderPush.deliver(order.id)]);
+        assert.equal((await d.whatsAppDelivery.findUniqueOrThrow({ where })).status, 'ACCEPTED');
+        assert.deepEqual(whatsappOrders, [String(pending.number), String(order.number), String(order.number)]);
       } finally {
         globalThis.fetch = originalFetch;
         for (const [key, value] of originalEnv) {

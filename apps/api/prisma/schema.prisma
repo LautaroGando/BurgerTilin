@@ -119,6 +119,7 @@ model Order {
   payments Payment[]
   onlineCheckout OnlineCheckout?
   pushDeliveries PushDelivery[]
+  whatsappDelivery WhatsAppDelivery?
   @@index([createdAt])
   @@index([status])
 }
@@ -146,6 +147,17 @@ model PushDelivery {
   sentAt DateTime?
   @@id([orderId,endpoint])
   @@index([sentAt,nextAttemptAt])
+}
+model WhatsAppDelivery {
+  orderId String @id
+  order Order @relation(fields:[orderId],references:[id],onDelete:Cascade)
+  recipient String
+  status String @default("PENDING")
+  attempts Int @default(0)
+  createdAt DateTime @default(now())
+  nextAttemptAt DateTime @default(now())
+  providerMessageId String?
+  @@index([status,nextAttemptAt])
 }
 model OnlineCheckout {
   orderId String @id
