@@ -31,6 +31,7 @@ import {
   X,
 } from 'lucide-react';
 import { api, money, date, statusNames, channelLabel, Product, CartLine } from '../lib/api';
+import { createOrderAlert } from '../lib/order-alert';
 import { Brand, Modal, Empty, Loading, Field, ErrorBox } from './ui';
 import { Customize, Checkout } from './shop';
 import { ProductsView, InventoryView, SettingsView } from './management';
@@ -136,14 +137,15 @@ export default function Admin() {
     [operation, setOperation] = useState({ paused: true, delay: 30 }),
     [connected, setConnected] = useState(false),
     [sound, setSound] = useState(false),
+    [activatingSound, setActivatingSound] = useState(false),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
     [filter, setFilter] = useState('ALL'),
     [detail, setDetail] = useState<any>(null),
     [tick, setTick] = useState(Date.now()),
     [mobile, setMobile] = useState(false);
-  const audio = useRef<AudioContext | null>(null);
-  const needsSound = useRef(false);
+  const audio = useRef<{ context: AudioContext; buffer: AudioBuffer } | null>(null);
+  const playback = useRef<AudioBufferSourceNode | null>(null);
   useEffect(() => {
     api('auth/me')
       .then(setUser)
@@ -200,30 +202,78 @@ export default function Admin() {
       clearInterval(timer);
     };
   }, [user, refresh]);
-  const beep = useCallback(() => {
-    const ctx = audio.current;
-    if (!ctx) return;
-    ctx.resume();
-    for (let i = 0; i < 2; i++) {
-      const osc = ctx.createOscillator(),
-        gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = i ? 880 : 660;
-      gain.gain.value = 0.13;
-      osc.start(ctx.currentTime + i * 0.22);
-      osc.stop(ctx.currentTime + i * 0.22 + 0.15);
-    }
+  const stopSound = useCallback(() => {
+    const source = playback.current;
+    if (!source) return;
+    playback.current = null;
+    source.stop();
+    source.disconnect();
   }, []);
-  needsSound.current = orders.some((o) => o.status === 'NEW' && !o.acknowledgedAt);
+  const playSound = useCallback(
+    (loop: boolean) => {
+      const alert = audio.current;
+      if (!alert || alert.context.state !== 'running') return;
+      stopSound();
+      const source = alert.context.createBufferSource();
+      source.buffer = alert.buffer;
+      source.loop = loop;
+      source.connect(alert.context.destination);
+      source.onended = () => {
+        if (playback.current !== source) return;
+        playback.current = null;
+        source.disconnect();
+      };
+      source.start();
+      playback.current = source;
+    },
+    [stopSound],
+  );
+  const newCount = orders.filter((order) => order.status === 'NEW').length;
+  const shouldRing = Boolean(user && sound && newCount);
   useEffect(() => {
-    if (!sound) return;
-    if (needsSound.current) beep();
-    const id = setInterval(() => {
-      if (needsSound.current) beep();
-    }, 7000);
-    return () => clearInterval(id);
-  }, [sound, beep]);
+    if (!shouldRing) return;
+    playSound(true);
+    return stopSound;
+  }, [shouldRing, playSound, stopSound]);
+  useEffect(() => {
+    if (!user) {
+      stopSound();
+      setSound(false);
+      setOrders([]);
+    }
+  }, [user, stopSound]);
+  useEffect(
+    () => () => {
+      stopSound();
+      const alert = audio.current;
+      audio.current = null;
+      if (alert) void alert.context.close().catch(() => {});
+    },
+    [stopSound],
+  );
+  async function toggleSound() {
+    if (sound) {
+      stopSound();
+      setSound(false);
+      return;
+    }
+    setActivatingSound(true);
+    try {
+      if (!audio.current) {
+        const context = new AudioContext();
+        audio.current = { context, buffer: createOrderAlert(context) };
+      }
+      const { context } = audio.current;
+      await context.resume();
+      if (context.state !== 'running') throw new Error('El navegador suspendió el sonido.');
+      if (!newCount) playSound(false);
+      setSound(true);
+    } catch {
+      setError('No se pudo activar el sonido. Volvé a intentar desde este botón.');
+    } finally {
+      setActivatingSound(false);
+    }
+  }
   const run = async (fn: () => Promise<any>) => {
     setBusy(true);
     setError('');
@@ -248,7 +298,6 @@ export default function Admin() {
     );
   const kitchen = view === 'kitchen' || user.role === 'KITCHEN';
   const shown = orders.filter((o) => filter === 'ALL' || o.status === filter);
-  const newCount = orders.filter((o) => o.status === 'NEW').length;
   return (
     <div className={'admin-shell ' + (mobile ? 'nav-open' : '')}>
       <aside className="sidebar">
@@ -358,15 +407,11 @@ export default function Admin() {
                 </div>
                 <button
                   className={'secondary ' + (sound ? 'sound-on' : '')}
-                  onClick={() => {
-                    if (!audio.current) audio.current = new AudioContext();
-                    audio.current.resume();
-                    beep();
-                    setSound(!sound);
-                  }}
+                  disabled={activatingSound}
+                  onClick={toggleSound}
                 >
                   {sound ? <Volume2 size={18} /> : <VolumeX size={18} />}{' '}
-                  {sound ? 'Sonido activo · probar / apagar' : 'Activar y probar sonido'}
+                  {sound ? 'Apagar sonido' : 'Activar y probar sonido'}
                 </button>
               </div>
               <div className="shift-bar">
@@ -407,13 +452,13 @@ export default function Admin() {
                   </select>
                 </label>
               </div>
-              {needsSound.current && (
+              {newCount > 0 && (
                 <div className="new-order-banner">
                   <Flame size={20} />
                   <strong>Hay pedidos nuevos esperando tu atención.</strong>
                   <span>
                     {sound
-                      ? 'La alerta se repite hasta reconocerlos.'
+                      ? 'La melodía sigue hasta atender todos los pedidos nuevos.'
                       : 'Activá el sonido para escuchar las alertas.'}
                   </span>
                 </div>
@@ -524,16 +569,7 @@ export default function Admin() {
                             </button>
                           )}
                           <div className="row spread">
-                            {o.status === 'NEW' && !o.acknowledgedAt ? (
-                              <button
-                                className="text-action"
-                                onClick={() => run(() => api(`admin/orders/${o.id}/ack`, {}))}
-                              >
-                                Reconocer
-                              </button>
-                            ) : (
-                              <span className="small muted">Est. {o.estimatedMinutes} min</span>
-                            )}
+                            <span className="small muted">Est. {o.estimatedMinutes} min</span>
                             <button className="text-action" onClick={() => setDetail(o)}>
                               {kitchen ? 'Ver comanda' : 'Ver detalle'}
                               <ArrowRight size={14} />
