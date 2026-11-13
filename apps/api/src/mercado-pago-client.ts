@@ -1,4 +1,4 @@
-import { BadGatewayException, ServiceUnavailableException } from '@nestjs/common';
+import { BadGatewayException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 
@@ -109,6 +109,17 @@ const providerOrder = z.object({
     .optional(),
 });
 
+const logger = new Logger('MercadoPagoAPI');
+const providerErrorCode = z
+  .string()
+  .regex(/^[a-z][a-z0-9_-]{0,63}$/i)
+  .optional();
+const providerError = z.object({
+  code: providerErrorCode,
+  error: providerErrorCode,
+  errors: z.array(z.object({ code: providerErrorCode })).optional(),
+});
+
 export function providerCents(value = '') {
   if (!/^\d{1,8}(?:\.\d{1,2})?$/.test(value)) return null;
   const [whole, fraction = ''] = value.split('.');
@@ -118,6 +129,7 @@ export function providerCents(value = '') {
 export async function mercadoPagoRequest(path = '', body?: object, key?: string) {
   const config = mercadoPagoConfig();
   if (!config) throw new ServiceUnavailableException('Mercado Pago no está habilitado');
+  const operation = body ? 'crear orden' : 'consultar orden';
   try {
     if (config.test) await verifySandbox(config.accessToken, config.seller);
     const response = await fetch('https://api.mercadopago.com/v1/orders' + path, {
@@ -129,12 +141,29 @@ export async function mercadoPagoRequest(path = '', body?: object, key?: string)
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal: AbortSignal.timeout(8000),
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const order = providerOrder.parse(await response.json());
-    if (config.test !== /^ORDTST/i.test(order.id)) throw new Error('Entorno de cobro inesperado');
-    return order;
+    const payload: unknown = await response.json().catch(() => undefined);
+    if (!response.ok) {
+      const error = providerError.safeParse(payload);
+      const codes = error.data
+        ? [error.data.code, error.data.error, ...(error.data.errors ?? []).map(({ code }) => code)]
+        : [];
+      logger.warn(
+        `No se pudo ${operation} (HTTP ${response.status}; ${codes.filter(Boolean).join(', ') || 'sin código'})`,
+      );
+    } else {
+      const order = providerOrder.safeParse(payload);
+      if (!order.success) {
+        const fields = [...new Set(order.error.issues.map(({ path }) => path.join('.') || 'raíz'))];
+        logger.warn(`Respuesta inválida al ${operation} (${fields.join(', ')})`);
+      } else if (config.test !== /^ORDTST/i.test(order.data.id)) {
+        logger.warn(`Entorno de cobro inesperado al ${operation}`);
+      } else {
+        return order.data;
+      }
+    }
   } catch (error) {
     if (error instanceof ServiceUnavailableException) throw error;
-    throw new BadGatewayException('Mercado Pago no respondió correctamente. Volvé a intentar.');
+    logger.warn(`No se pudo conectar con Mercado Pago al ${operation}`);
   }
+  throw new BadGatewayException('Mercado Pago no respondió correctamente. Volvé a intentar.');
 }
