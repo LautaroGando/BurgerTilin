@@ -4,8 +4,54 @@ import { DateTime } from 'luxon';
 import { z } from 'zod';
 import { Db } from './db';
 import { defaults, productConfig, choiceInput, lineInput, Settings, TZ } from './domain';
+import { mercadoPagoConfig } from './mercado-pago-client';
 type Tx = Prisma.TransactionClient;
 export type Consumption = Map<string, number>;
+type ProductConfig = z.infer<typeof productConfig>;
+
+function costOfConsumption(
+  consumption: Consumption,
+  ingredients: ReadonlyMap<string, { cost: Prisma.Decimal | null }>,
+) {
+  if (!consumption.size) return null;
+  let cost = new Prisma.Decimal(0);
+  for (const [id, quantity] of consumption) {
+    const unitCost = ingredients.get(id)?.cost;
+    if (unitCost == null) return null;
+    cost = cost.plus(unitCost.times(quantity));
+  }
+  return cost.round().toNumber();
+}
+
+function baseProductCost(
+  config: ProductConfig,
+  products: ReadonlyMap<string, Product>,
+  ingredients: ReadonlyMap<string, { cost: Prisma.Decimal | null }>,
+) {
+  const consumption: Consumption = new Map();
+  const addRecipe = (recipe: ProductConfig['recipe'], quantity: number) => {
+    for (const item of recipe) {
+      const previous = consumption.get(item.ingredientId) ?? 0;
+      consumption.set(item.ingredientId, previous + item.quantity * quantity);
+    }
+  };
+
+  let priceDelta = 0;
+  addRecipe(config.recipe, 1);
+  for (const slot of config.slots) {
+    // The checkout starts with the first option and the base recipe in each group.
+    const choice = slot.choices[0];
+    const product = products.get(choice.productId);
+    if (!product) return { ingredientCost: null, priceDelta: 0 };
+    const component = productConfig.parse(product.config);
+    if (component.slots.length || !component.recipe.length)
+      return { ingredientCost: null, priceDelta: 0 };
+    addRecipe(component.recipe, slot.quantity);
+    priceDelta += choice.delta * slot.quantity;
+  }
+  return { ingredientCost: costOfConsumption(consumption, ingredients), priceDelta };
+}
+
 @Injectable()
 export class Catalog {
   constructor(@Inject(Db) readonly db: Db) {}
@@ -163,27 +209,30 @@ export class Catalog {
     });
     if (ingredients.length !== ingredientIds.size)
       throw new BadRequestException('La receta tiene insumos inexistentes');
-    let cost = 0,
-      complete = true;
-    const names = new Map(ingredients.map((i) => [i.id, i.name]));
+    const byIngredientId = new Map(ingredients.map((i) => [i.id, i]));
     for (const item of items) {
-      item.remove = item.remove.map((id: string) => names.get(id) || id);
+      item.remove = item.remove.map((id: string) => byIngredientId.get(id)?.name || id);
       for (const sub of item.components)
-        sub.remove = sub.remove.map((id: string) => names.get(id) || id);
+        sub.remove = sub.remove.map((id: string) => byIngredientId.get(id)?.name || id);
     }
     for (const ingredient of ingredients) {
       const needed = consumption.get(ingredient.id);
       if (needed === undefined) continue;
       if (ingredient.strict && ingredient.stock - ingredient.reserved < needed)
         throw new BadRequestException(`Sin stock suficiente: ${ingredient.name}`);
-      if (ingredient.cost === null) complete = false;
-      else cost += Number(ingredient.cost) * needed;
     }
-    // A missing recipe is explicitly an unknown cost, never a zero-cost burger.
-    if (!consumption.size || missingRecipe) complete = false;
-    return { items, subtotal, consumption, ingredientCost: complete ? Math.round(cost) : null };
+    const ingredientCost = missingRecipe ? null : costOfConsumption(consumption, byIngredientId);
+    return { items, subtotal, consumption, ingredientCost };
   }
-  async list(publicView: boolean, archived = false) {
+  async list({
+    publicView,
+    archived = false,
+    includeCosts = false,
+  }: {
+    publicView: boolean;
+    archived?: boolean;
+    includeCosts?: boolean;
+  }) {
     const products = await this.db.product.findMany({
       where: {
         archivedAt: archived ? { not: null } : null,
@@ -194,6 +243,24 @@ export class Catalog {
     const ingredients = await this.db.ingredient.findMany({ where: { archivedAt: null } });
     const stock = new Map(ingredients.map((i) => [i.id, i]));
     const byId = new Map(products.map((p) => [p.id, p]));
+    const showCosts = !publicView && includeCosts;
+    const online =
+      showCosts && !archived && process.env.MP_FEE_BPS?.trim() ? mercadoPagoConfig() : undefined;
+    const webChannel = online && (await this.settings()).channels.find((c) => c.id === 'WEB');
+    if (showCosts && archived) {
+      const componentIds = new Set(
+        products.flatMap((p) =>
+          productConfig.parse(p.config).slots.map((slot) => slot.choices[0].productId),
+        ),
+      );
+      const activeIds = [...componentIds].filter((id) => !byId.has(id));
+      if (activeIds.length) {
+        const components = await this.db.product.findMany({
+          where: { id: { in: activeIds }, archivedAt: null },
+        });
+        for (const product of components) byId.set(product.id, product);
+      }
+    }
     const available = (p: Product, seen = new Set<string>()): boolean => {
       if (seen.has(p.id) || p.soldOut || !p.published || p.price === null) return false;
       const next = new Set(seen).add(p.id);
@@ -215,9 +282,20 @@ export class Catalog {
     };
     return products.map((p) => {
       const c = productConfig.parse(p.config);
+      const baseCost = showCosts ? baseProductCost(c, byId, stock) : undefined;
+      let onlineMargin: number | undefined;
+      if (online && webChannel && baseCost?.ingredientCost != null && p.price !== null) {
+        const webPrice = (c.channelPrices.WEB ?? p.price) + baseCost.priceDelta;
+        if (webPrice > 0) {
+          const paymentFee = Math.round((webPrice * online.feeBps) / 10000);
+          const channelFee = Math.round((webPrice * webChannel.feeBps) / 10000);
+          onlineMargin = webPrice - baseCost.ingredientCost - paymentFee - channelFee;
+        }
+      }
       return {
         ...p,
         available: available(p),
+        ...(baseCost ? { baseCost: { ...baseCost, onlineMargin } } : {}),
         config: publicView
           ? {
               ...c,

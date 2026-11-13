@@ -142,7 +142,7 @@ class Api {
   @Get('catalog') async publicCatalog() {
     const settings = await this.catalog.settings();
     return {
-      products: await this.catalog.list(true),
+      products: await this.catalog.list({ publicView: true }),
       settings: {
         delay: settings.delay,
         whatsapp: settings.whatsapp,
@@ -239,11 +239,11 @@ class Api {
       interval(15000).pipe(map(() => ({ data: JSON.stringify({ heartbeat: true }) }))),
     );
   }
-  @Get('admin/products') @Roles(...staff) products() {
-    return this.catalog.list(false);
+  @Get('admin/products') @Roles(...staff) products(@Req() req: AuthRequest) {
+    return this.catalog.list({ publicView: false, includeCosts: req.user.role === 'OWNER' });
   }
   @Get('admin/products/archived') @Roles('OWNER') archivedProducts() {
-    return this.catalog.list(false, true);
+    return this.catalog.list({ publicView: false, archived: true, includeCosts: true });
   }
   @Patch('admin/products/:id/archive') @Roles('OWNER') archiveProduct(
     @Param('id') id: string,

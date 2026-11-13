@@ -570,8 +570,13 @@ export function JsonField({ value, onChange }: { value: any; onChange: (v: any) 
     </>
   );
 }
+type ManagedProduct = Product & {
+  baseCost?: { ingredientCost: number | null; priceDelta: number; onlineMargin?: number };
+};
+
 export function ProductsView({ role }: { role: string }) {
-  const [products, setProducts] = useState<Product[]>([]),
+  const showCosts = role === 'OWNER';
+  const [products, setProducts] = useState<ManagedProduct[]>([]),
     [query, setQuery] = useState(''),
     [archived, setArchived] = useState(false),
     [archiveTarget, setArchiveTarget] = useState<Product>(),
@@ -603,7 +608,11 @@ export function ProductsView({ role }: { role: string }) {
         <div>
           <span className="eyebrow orange">TU CARTA</span>
           <h1>Productos.</h1>
-          <p className="muted">Disponibilidad al toque. Datos comerciales bajo tu control.</p>
+          <p className="muted">
+            {showCosts
+              ? 'El margen principal usa el precio general y el costo de la receta base. En combos se usan las opciones iniciales. Si figura Mercado Pago, esa cifra descuenta las comisiones estimadas de la venta web.'
+              : 'Disponibilidad al toque. Datos comerciales bajo tu control.'}
+          </p>
         </div>
         {role === 'OWNER' && !archived && (
           <div className="row">
@@ -643,6 +652,8 @@ export function ProductsView({ role }: { role: string }) {
               <th>Producto</th>
               <th>Categoría</th>
               {role !== 'KITCHEN' && <th>Precio</th>}
+              {showCosts && <th>Costo unitario</th>}
+              {showCosts && <th>Margen estimado</th>}
               <th>Publicación</th>
               <th>Disponibilidad</th>
               {role === 'OWNER' && <th />}
@@ -651,63 +662,96 @@ export function ProductsView({ role }: { role: string }) {
           <tbody>
             {(loadedArchived === archived ? products : [])
               .filter((p) => p.name.toLowerCase().includes(query.toLowerCase()))
-              .map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <div className="table-product">
-                      {p.image && <img src={p.image} alt="" />}
-                      <b>{p.name}</b>
-                    </div>
-                  </td>
-                  <td>{p.category}</td>
-                  {role !== 'KITCHEN' && <td>{money(p.price)}</td>}
-                  <td>
-                    <span className={'tag ' + (!archived && p.published ? 'green' : '')}>
-                      {archived ? 'Archivado' : p.published ? 'Publicado' : 'Borrador'}
-                    </span>
-                  </td>
-                  <td>
-                    {archived ? (
-                      '—'
-                    ) : (
-                      <button
-                        className={'availability ' + (p.soldOut ? 'out' : '')}
-                        onClick={async () => {
-                          try {
-                            await api(
-                              `admin/products/${p.id}/availability`,
-                              { soldOut: !p.soldOut },
-                              'PATCH',
-                            );
-                            load();
-                          } catch (e: any) {
-                            setError(e.message);
-                          }
-                        }}
-                      >
-                        {p.soldOut ? 'Agotado' : 'Disponible'}
-                      </button>
-                    )}
-                  </td>
-                  {role === 'OWNER' && (
+              .map((p) => {
+                const cost = p.baseCost?.ingredientCost ?? null;
+                const priceDelta = p.baseCost?.priceDelta ?? 0;
+                const priceWithOptions = p.price === null ? null : p.price + priceDelta;
+                const margin =
+                  cost === null || priceWithOptions === null || priceWithOptions < 0
+                    ? null
+                    : priceWithOptions - cost;
+                return (
+                  <tr key={p.id}>
                     <td>
-                      <div className="row">
-                        {!archived && (
-                          <button className="text-action" onClick={() => setEditor(p)}>
-                            Editar <ArrowUpRight size={15} />
-                          </button>
-                        )}
-                        <button
-                          className={archived ? 'text-action' : 'danger-text'}
-                          onClick={() => setArchiveTarget(p)}
-                        >
-                          {archived ? 'Restaurar' : 'Archivar'}
-                        </button>
+                      <div className="table-product">
+                        {p.image && <img src={p.image} alt="" />}
+                        <b>{p.name}</b>
                       </div>
                     </td>
-                  )}
-                </tr>
-              ))}
+                    <td>{p.category}</td>
+                    {role !== 'KITCHEN' && (
+                      <td>
+                        {money(p.price)}
+                        {showCosts && p.price !== null && priceDelta !== 0 && (
+                          <small>Con opciones iniciales: {money(priceWithOptions)}</small>
+                        )}
+                      </td>
+                    )}
+                    {showCosts && (
+                      <td>
+                        {cost === null ? (
+                          <span className="muted">Costo incompleto</span>
+                        ) : (
+                          money(cost)
+                        )}
+                      </td>
+                    )}
+                    {showCosts && (
+                      <td>
+                        {margin === null ? '—' : <b>{money(margin)}</b>}
+                        {p.baseCost?.onlineMargin !== undefined && (
+                          <small>Con Mercado Pago: {money(p.baseCost.onlineMargin)}</small>
+                        )}
+                      </td>
+                    )}
+                    <td>
+                      <span className={'tag ' + (!archived && p.published ? 'green' : '')}>
+                        {archived ? 'Archivado' : p.published ? 'Publicado' : 'Borrador'}
+                      </span>
+                    </td>
+                    <td>
+                      {archived ? (
+                        '—'
+                      ) : (
+                        <button
+                          className={'availability ' + (p.soldOut ? 'out' : '')}
+                          onClick={async () => {
+                            try {
+                              await api(
+                                `admin/products/${p.id}/availability`,
+                                { soldOut: !p.soldOut },
+                                'PATCH',
+                              );
+                              load();
+                            } catch (e: any) {
+                              setError(e.message);
+                            }
+                          }}
+                        >
+                          {p.soldOut ? 'Agotado' : 'Disponible'}
+                        </button>
+                      )}
+                    </td>
+                    {role === 'OWNER' && (
+                      <td>
+                        <div className="row">
+                          {!archived && (
+                            <button className="text-action" onClick={() => setEditor(p)}>
+                              Editar <ArrowUpRight size={15} />
+                            </button>
+                          )}
+                          <button
+                            className={archived ? 'text-action' : 'danger-text'}
+                            onClick={() => setArchiveTarget(p)}
+                          >
+                            {archived ? 'Restaurar' : 'Archivar'}
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
         {archived && loadedArchived === archived && products.length === 0 && (
