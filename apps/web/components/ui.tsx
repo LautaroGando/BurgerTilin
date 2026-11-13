@@ -6,11 +6,7 @@ export function Brand({ admin = false }: { admin?: boolean }) {
   return (
     <span className={admin ? 'brand admin-brand' : 'brand'}>
       <span className="brand-icon">
-        <img
-          className="brand-logo"
-          src={admin ? '/admin-icons/brand-mark.webp' : '/assets/Logos%20y%20Banners/Logo%202.jpeg'}
-          alt=""
-        />
+        <img className="brand-logo" src="/assets/brand-mark.webp" alt="" />
       </span>
       <span>
         BURGER{' '}
