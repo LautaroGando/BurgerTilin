@@ -147,8 +147,13 @@ export async function mercadoPagoRequest(path = '', body?: object, key?: string)
       const codes = error.data
         ? [error.data.code, error.data.error, ...(error.data.errors ?? []).map(({ code }) => code)]
         : [];
+      const requestId = response.headers.get('x-request-id');
+      const requestContext =
+        requestId && /^[a-z0-9_-]{1,128}$/i.test(requestId)
+          ? `, x-request-id de Mercado Pago: ${requestId}`
+          : '';
       logger.warn(
-        `No se pudo ${operation} (HTTP ${response.status}; ${codes.filter(Boolean).join(', ') || 'sin código'})`,
+        `No se pudo ${operation} (HTTP ${response.status}; ${codes.filter(Boolean).join(', ') || 'sin código'}${requestContext})`,
       );
     } else {
       const order = providerOrder.safeParse(payload);
