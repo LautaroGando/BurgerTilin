@@ -356,6 +356,34 @@ test(
       });
       assert.equal(login.status, 201);
       const cookie = login.headers.get('set-cookie')!.split(';')[0];
+      const { OrderPush } = await import('../src/order-push');
+      const orderPush = app.get(OrderPush);
+      const sent: string[] = [];
+      const transport = orderPush as unknown as { send: (...args: unknown[]) => Promise<void> };
+      let failPush = false;
+      transport.send = async (_device, _key, _title, _body, tag) => {
+        if (failPush) throw new Error('Proveedor de prueba no disponible');
+        sent.push(String(tag));
+      };
+      const pushHeaders = { cookie, 'Content-Type': 'application/json' };
+      const keyUrl = url + '/admin/push/key';
+      assert.equal((await fetch(keyUrl)).status, 401);
+      const [key1, key2] = await Promise.all([fetch(keyUrl, { headers: { cookie } }), fetch(keyUrl, { headers: { cookie } })]);
+      assert.equal(key1.status, 200);
+      const identity = await key1.json();
+      assert.deepEqual(await key2.json(), identity);
+      assert.deepEqual(Object.keys(identity), ['publicKey']);
+      const device = {
+        endpoint: 'https://fcm.googleapis.com/fcm/send/fixture',
+        keys: { p256dh: identity.publicKey, auth: 'A'.repeat(22) },
+      };
+      const pushRequest = (path: string, body: unknown) => fetch(url + '/admin/push/' + path, {
+        method: 'POST', headers: pushHeaders, body: JSON.stringify(body),
+      });
+      assert.equal((await pushRequest('device', { ...device, endpoint: 'https://fcm.googleapis.com.evil.test/send' })).status, 400);
+      assert.equal((await pushRequest('device', device)).status, 201);
+      assert.equal((await pushRequest('test', { endpoint: device.endpoint })).status, 201);
+      assert.deepEqual(sent, ['test']);
       const readShift = () => fetch(url + '/admin/shift', { headers: { cookie } });
       const closeShift = (shiftId: string, counted: number) =>
         fetch(url + '/admin/shift/close', {
@@ -620,6 +648,7 @@ test(
         const pending = await create.json();
         assert.equal(pending.checkoutUrl, null);
         assert.equal((await o.tracking(pending.tracking)).paymentStatus, 'PENDING');
+        assert.equal(await d.pushDelivery.count({ where: { orderId: pending.id } }), 0);
         const retry = await fetch(url + `/tracking/${pending.tracking}/mercado-pago`, {
           method: 'POST',
         });
@@ -666,6 +695,8 @@ test(
         assert.equal((await webhook()).status, 201);
         assert.equal((await webhook()).status, 201);
         assert.equal((await o.tracking(pending.tracking)).paymentStatus, 'PAID');
+        assert.equal(sent.filter((tag) => tag === 'pedido-' + pending.number).length, 1);
+        assert.equal(await d.pushDelivery.count({ where: { orderId: pending.id, sentAt: { not: null } } }), 1);
         assert.ok((await o.active()).some((item) => item.id === pending.id));
         const mpSales = await f.sales({ method: 'mercadopago_online' });
         assert.deepEqual(
@@ -740,8 +771,8 @@ test(
       assert.equal((await archive(`products/${p.id}`, true, cookie)).status, 400);
       assert.equal((await archive(`ingredients/${comboIngredient.id}`, true, cookie)).status, 400);
       assert.equal((await archive(`products/${combo.id}`, true, cookie)).status, 200);
-      assert.ok(!(await c.list(true)).some((product) => product.id === combo.id));
-      assert.ok((await c.list(false, true)).some((product) => product.id === combo.id));
+      assert.ok(!(await c.list({ publicView: true })).some((product) => product.id === combo.id));
+      assert.ok((await c.list({ publicView: false, archived: true })).some((product) => product.id === combo.id));
       const ingredientTarget = await d.ingredient.create({
         data: { name: 'Insumo para archivar', unit: 'unit', stock: 7 },
       });
@@ -761,7 +792,24 @@ test(
         7,
       );
       assert.equal((await archive(`products/${combo.id}`, false, cookie)).status, 200);
-      assert.ok((await c.list(true)).some((product) => product.id === combo.id));
+      assert.ok((await c.list({ publicView: true })).some((product) => product.id === combo.id));
+      const cashOrder = input();
+      const placeCash = () => fetch(url + '/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cashOrder),
+      });
+      failPush = true;
+      const cashResponse = await placeCash();
+      assert.equal(cashResponse.status, 201);
+      const newCashOrder = await cashResponse.json();
+      assert.equal((await (await placeCash()).json()).id, newCashOrder.id);
+      const deliveryKey = { orderId_endpoint: { orderId: newCashOrder.id, endpoint: device.endpoint } };
+      assert.equal((await d.pushDelivery.findUniqueOrThrow({ where: deliveryKey })).sentAt, null);
+      await d.pushDelivery.update({ where: deliveryKey, data: { nextAttemptAt: new Date() } });
+      failPush = false;
+      await Promise.all([orderPush.deliver(newCashOrder.id), orderPush.deliver(newCashOrder.id)]);
+      assert.equal(sent.filter((tag) => tag === 'pedido-' + newCashOrder.number).length, 1);
       const changePassword = await fetch(url + '/auth/password', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
@@ -769,6 +817,7 @@ test(
       });
       assert.equal(changePassword.status, 201);
       assert.equal((await fetch(url + '/auth/me', { headers: { cookie } })).status, 401);
+      assert.equal(await d.pushDevice.count({ where: { userId: actor.id } }), 0);
     } finally {
       await app.close();
     }

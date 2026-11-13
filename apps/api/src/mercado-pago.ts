@@ -15,6 +15,7 @@ import { Db } from './db';
 import { hash } from './auth';
 import { audit, Orders } from './orders';
 import { atomic } from './transactions';
+import { OrderPush, queueOrderPush } from './order-push';
 import {
   mercadoPagoConfig,
   mercadoPagoRequest,
@@ -36,6 +37,7 @@ export class MercadoPago implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(Db) private db: Db,
     @Inject(Orders) private orders: Orders,
+    @Inject(OrderPush) private push: OrderPush,
   ) {}
 
   onModuleInit() {
@@ -234,7 +236,12 @@ export class MercadoPago implements OnModuleInit, OnModuleDestroy {
         });
         updated = true;
       }
-      if (!refunds.length) return updated;
+      if (!refunds.length) {
+        if (updated && order.status === 'NEW' && order.channel === 'WEB' && await queueOrderPush(tx, order.id)) {
+          return order.id;
+        }
+        return updated;
+      }
       for (const item of refunds) {
         const amount = providerCents(item.amount);
         if (!amount) continue;
@@ -277,6 +284,7 @@ export class MercadoPago implements OnModuleInit, OnModuleDestroy {
       return true;
     });
     if (changed) this.orders.notify();
+    if (typeof changed === 'string') await this.push.deliver(changed);
   }
 
   async reconcilePending() {

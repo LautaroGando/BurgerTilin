@@ -353,6 +353,7 @@ export class Operations {
         data: { ...data, ...(password ? { password: passwordHash(password) } : {}) },
       });
       await tx.session.deleteMany({ where: { userId: id } });
+      await tx.pushDevice.deleteMany({ where: { userId: id } });
       await audit(tx, actor, 'UPDATE_ACCESS', id, {
         role: u.role,
         active: u.active,

@@ -44,6 +44,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { MediaService, mediaUploadLimit } from './media';
 import { MercadoPago } from './mercado-pago';
 import { mercadoPagoConfig, onlineMethod, reservedPaymentMethod } from './mercado-pago-client';
+import { OrderPush, pushEndpoint } from './order-push';
 type AuthRequest = Request & { user: { id: string; role: string; email: string } };
 const staff = ['OWNER', 'CASHIER', 'KITCHEN'],
   cash = ['OWNER', 'CASHIER'];
@@ -83,6 +84,7 @@ class Api {
     @Inject(Imports) private imports: Imports,
     @Inject(MediaService) private media: MediaService,
     @Inject(MercadoPago) private mercadoPago: MercadoPago,
+    @Inject(OrderPush) private push: OrderPush,
   ) {}
   @Get('admin/media') @Roles('OWNER') library() {
     return this.media.list();
@@ -134,10 +136,34 @@ class Api {
   @Post('auth/logout') @Roles(...staff) async logout(
     @Req() req: AuthRequest,
     @Res({ passthrough: true }) res: Response,
+    @Body() body: unknown,
   ) {
-    await this.db.session.deleteMany({ where: { token: hash(req.cookies.tilin_session) } });
+    const { endpoint } = z.object({ endpoint: pushEndpoint.optional() }).parse(body ?? {});
+    await this.db.$transaction(async (tx) => {
+      if (endpoint) await tx.pushDevice.deleteMany({ where: { endpoint, userId: req.user.id } });
+      await tx.session.deleteMany({ where: { token: hash(req.cookies.tilin_session) } });
+    });
     res.clearCookie('tilin_session', { path: '/' });
     return { ok: true };
+  }
+  @Get('admin/push/key') @Roles(...staff) pushKey() {
+    return this.push.publicKey();
+  }
+  @Post('admin/push/device') @Roles(...staff) registerPush(@Req() req: AuthRequest, @Body() body: unknown) {
+    return this.push.save(req.user.id, body);
+  }
+  @Post('admin/push/status') @Roles(...staff) async pushStatus(@Req() req: AuthRequest, @Body() body: unknown) {
+    const { endpoint } = z.object({ endpoint: pushEndpoint }).parse(body);
+    const device = await this.db.pushDevice.findFirst({ where: { endpoint, userId: req.user.id }, select: { endpoint: true } });
+    return { enabled: Boolean(device) };
+  }
+  @Post('admin/push/remove') @Roles(...staff) removePush(@Req() req: AuthRequest, @Body() body: unknown) {
+    const { endpoint } = z.object({ endpoint: pushEndpoint }).parse(body);
+    return this.push.remove(req.user.id, endpoint);
+  }
+  @Post('admin/push/test') @Roles(...staff) testPush(@Req() req: AuthRequest, @Body() body: unknown) {
+    const { endpoint } = z.object({ endpoint: pushEndpoint }).parse(body);
+    return this.push.test(req.user.id, endpoint);
   }
   @Get('catalog') async publicCatalog() {
     const settings = await this.catalog.settings();
@@ -193,7 +219,10 @@ class Api {
     ) {
       throw new UnauthorizedException();
     }
-    if (mercadoPagoConfig()) await this.mercadoPago.reconcilePending();
+    await Promise.all([
+      this.push.deliver(),
+      mercadoPagoConfig() && this.mercadoPago.reconcilePending(),
+    ]);
     return { ok: true };
   }
   @Get('tracking/:token') track(@Param('token') token: string) {
@@ -433,6 +462,7 @@ class Api {
         data: { password: passwordHash(input.password) },
       });
       await tx.session.deleteMany({ where: { userId: user.id } });
+      await tx.pushDevice.deleteMany({ where: { userId: user.id } });
       await audit(tx, user.id, 'CHANGE_PASSWORD', user.id, {});
     });
     return { ok: true };
@@ -461,6 +491,7 @@ class Api {
     Imports,
     MediaService,
     MercadoPago,
+    OrderPush,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
 })

@@ -26,6 +26,7 @@ model User {
   role Role
   active Boolean @default(true)
   sessions Session[]
+  pushDevices PushDevice[]
 }
 model Session {
   token String @id
@@ -117,8 +118,34 @@ model Order {
   reservations Reservation[]
   payments Payment[]
   onlineCheckout OnlineCheckout?
+  pushDeliveries PushDelivery[]
   @@index([createdAt])
   @@index([status])
+}
+model PushIdentity {
+  id Int @id
+  publicKey String
+  privateKey String
+}
+model PushDevice {
+  endpoint String @id
+  userId String
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  p256dh String
+  auth String
+  deliveries PushDelivery[]
+  @@index([userId])
+}
+model PushDelivery {
+  orderId String
+  order Order @relation(fields:[orderId],references:[id],onDelete:Cascade)
+  endpoint String
+  device PushDevice @relation(fields:[endpoint],references:[endpoint],onDelete:Cascade)
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  sentAt DateTime?
+  @@id([orderId,endpoint])
+  @@index([sentAt,nextAttemptAt])
 }
 model OnlineCheckout {
   orderId String @id

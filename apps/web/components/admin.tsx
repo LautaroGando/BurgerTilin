@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Volume2,
   VolumeX,
+  Bell,
   Pause,
   Play,
   Plus,
@@ -32,10 +33,14 @@ import {
 } from 'lucide-react';
 import { api, money, date, statusNames, channelLabel, Product, CartLine } from '../lib/api';
 import { createOrderAlert } from '../lib/order-alert';
+import { currentAdminSubscription, registerAdminWorker } from '../lib/admin-push';
 import { Brand, Modal, Empty, Loading, Field, ErrorBox } from './ui';
 import { Customize, Checkout } from './shop';
 import { ProductsView, InventoryView, SettingsView } from './management';
 import { SalesView, CashView, CustomersView, ReportsView, OrderDetail } from './operations-ui';
+import AdminMobile from './admin-mobile';
+
+type InstallPrompt = Event & { prompt: () => Promise<unknown> };
 const navigation = [
   { id: 'orders', label: 'Pedidos', icon: LayoutGrid },
   { id: 'kitchen', label: 'Modo cocina', icon: ChefHat },
@@ -143,7 +148,9 @@ export default function Admin() {
     [filter, setFilter] = useState('ALL'),
     [detail, setDetail] = useState<any>(null),
     [tick, setTick] = useState(Date.now()),
-    [mobile, setMobile] = useState(false);
+    [mobile, setMobile] = useState(false),
+    [appSettings, setAppSettings] = useState(false),
+    [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
   const audio = useRef<{ context: AudioContext; buffer: AudioBuffer } | null>(null);
   const playback = useRef<AudioBufferSourceNode | null>(null);
   useEffect(() => {
@@ -164,6 +171,33 @@ export default function Admin() {
       return false;
     }
   }, []);
+  useEffect(() => {
+    const rememberPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as InstallPrompt);
+    };
+    const installed = () => setInstallPrompt(null);
+    window.addEventListener('beforeinstallprompt', rememberPrompt);
+    window.addEventListener('appinstalled', installed);
+    if ('serviceWorker' in navigator) void registerAdminWorker().catch(() => {});
+    return () => {
+      window.removeEventListener('beforeinstallprompt', rememberPrompt);
+      window.removeEventListener('appinstalled', installed);
+    };
+  }, []);
+  useEffect(() => {
+    if (!user || !('serviceWorker' in navigator)) return;
+    const showOrders = (event: MessageEvent) => {
+      if (event.data?.type !== 'show-orders') return;
+      setView('orders');
+      setFilter('ALL');
+      setAppSettings(false);
+      setDetail(null);
+      void refresh();
+    };
+    navigator.serviceWorker.addEventListener('message', showOrders);
+    return () => navigator.serviceWorker.removeEventListener('message', showOrders);
+  }, [user, refresh]);
   useEffect(() => {
     if (!user) return;
     if (user.pollOrders) {
@@ -345,7 +379,10 @@ export default function Admin() {
               className="icon-btn"
               onClick={() =>
                 run(async () => {
-                  await api('auth/logout', {});
+                  const subscription = await currentAdminSubscription().catch(() => null);
+                  await api('auth/logout', { endpoint: subscription?.endpoint });
+                  await subscription?.unsubscribe().catch(() => {});
+                  setAppSettings(false);
                   setUser(null);
                 })
               }
@@ -368,6 +405,9 @@ export default function Admin() {
             MI LOCAL <span>/</span> <b>{navigation.find((n) => n.id === view)?.label}</b>
           </div>
           <div className="row">
+            <button type="button" className="icon-btn" title="App y avisos de pedidos" aria-label="App y avisos de pedidos" onClick={() => setAppSettings(true)}>
+              <Bell size={20} />
+            </button>
             <span className={'connection ' + (connected ? 'online' : 'offline')}>
               {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
               {connected ? 'En vivo' : 'Reconectando…'}
@@ -382,6 +422,12 @@ export default function Admin() {
             </span>
           </div>
         </header>
+        {appSettings && (
+          <AdminMobile close={() => setAppSettings(false)} install={installPrompt ? async () => {
+            await installPrompt.prompt();
+            setInstallPrompt(null);
+          } : undefined} />
+        )}
         <main className="admin-content" key={view}>
           <ErrorBox message={error} />
           {!connected && (

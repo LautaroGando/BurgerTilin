@@ -14,6 +14,7 @@ import { Catalog } from './catalog';
 import { hash } from './auth';
 import { activeChannel, opening, orderInput, phoneKey, transitions, integerMoney } from './domain';
 import { atomic } from './transactions';
+import { OrderPush, queueOrderPush } from './order-push';
 import {
   mercadoPagoConfig,
   onlineMethod,
@@ -34,6 +35,7 @@ export class Orders {
   constructor(
     @Inject(Db) readonly db: Db,
     @Inject(Catalog) readonly catalog: Catalog,
+    @Inject(OrderPush) private push?: OrderPush,
   ) {}
   notify() {
     this.events.next({ data: JSON.stringify({ refresh: true, at: Date.now() }) });
@@ -43,12 +45,12 @@ export class Orders {
     if (!actor && input.channel !== 'WEB') throw new BadRequestException('Canal inválido');
     if (!actor && input.discount) throw new BadRequestException('Descuento no autorizado');
     const requestHash = hash(JSON.stringify(input));
-    const order = await atomic(this.db, async (tx) => {
+    const { order, queued } = await atomic(this.db, async (tx) => {
       const existing = await tx.order.findUnique({ where: { key: input.key } });
       if (existing) {
         if (existing.requestHash !== requestHash)
           throw new ConflictException('La clave ya pertenece a otro pedido');
-        return existing;
+        return { order: existing, queued: false };
       }
       const settings = await this.catalog.settings(tx);
       if (!actor && !opening(settings).open)
@@ -147,9 +149,11 @@ export class Orders {
         channel: channel.id,
         total,
       });
-      return created;
+      const queued = Boolean(!actor && !online && this.push && await queueOrderPush(tx, created.id));
+      return { order: created, queued };
     });
     this.notify();
+    if (queued) await this.push?.deliver(order.id);
     return {
       id: order.id,
       number: order.number,
