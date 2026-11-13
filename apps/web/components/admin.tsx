@@ -41,6 +41,7 @@ import { SalesView, CashView, CustomersView, ReportsView, OrderDetail } from './
 import AdminMobile from './admin-mobile';
 
 type InstallPrompt = Event & { prompt: () => Promise<unknown> };
+const soundPreferenceKey = 'tilin-order-sound';
 const navigation = [
   { id: 'orders', label: 'Pedidos', icon: LayoutGrid },
   { id: 'kitchen', label: 'Modo cocina', icon: ChefHat },
@@ -142,7 +143,7 @@ export default function Admin() {
     [operation, setOperation] = useState({ paused: true, delay: 30 }),
     [connected, setConnected] = useState(false),
     [sound, setSound] = useState(false),
-    [activatingSound, setActivatingSound] = useState(false),
+    [audioReady, setAudioReady] = useState(false),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false),
     [filter, setFilter] = useState('ALL'),
@@ -153,6 +154,7 @@ export default function Admin() {
     [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
   const audio = useRef<{ context: AudioContext; buffer: AudioBuffer } | null>(null);
   const playback = useRef<AudioBufferSourceNode | null>(null);
+  const previewSound = useRef(false);
   useEffect(() => {
     api('auth/me')
       .then(setUser)
@@ -262,20 +264,61 @@ export default function Admin() {
     },
     [stopSound],
   );
-  const newCount = orders.filter((order) => order.status === 'NEW').length;
-  const shouldRing = Boolean(user && sound && newCount);
+  const prepareSound = useCallback(() => {
+    if (!audio.current) {
+      const context = new AudioContext();
+      audio.current = { context, buffer: createOrderAlert(context) };
+      context.onstatechange = () => {
+        if (audio.current?.context === context) setAudioReady(context.state === 'running');
+      };
+    }
+    const { context } = audio.current;
+    setAudioReady(context.state === 'running');
+    // Before a user gesture, resume() can stay pending until the browser allows playback.
+    if (context.state !== 'running') void context.resume().catch(() => {});
+  }, []);
+
   useEffect(() => {
-    if (!shouldRing) return;
-    playSound(true);
-    return stopSound;
-  }, [shouldRing, playSound, stopSound]);
+    try {
+      setSound(localStorage.getItem(soundPreferenceKey) === 'on');
+    } catch {
+      // The sound control is still available when browser storage is blocked.
+    }
+  }, []);
+  useEffect(() => {
+    if (!user || !sound || audioReady) return;
+    try {
+      prepareSound();
+    } catch {
+      setError('No se pudo activar el sonido en este navegador.');
+      return;
+    }
+    window.addEventListener('click', prepareSound, true);
+    window.addEventListener('keydown', prepareSound, true);
+    return () => {
+      window.removeEventListener('click', prepareSound, true);
+      window.removeEventListener('keydown', prepareSound, true);
+    };
+  }, [user, sound, audioReady, prepareSound]);
+
+  const newCount = orders.filter((order) => order.status === 'NEW').length;
+  const canPlaySound = Boolean(user && sound && audioReady);
+  const hasNewOrders = newCount > 0;
+  useEffect(() => {
+    if (!canPlaySound) return;
+    const shouldPlay = hasNewOrders || previewSound.current;
+    previewSound.current = false;
+    if (shouldPlay) {
+      playSound(hasNewOrders);
+      return stopSound;
+    }
+  }, [canPlaySound, hasNewOrders, playSound, stopSound]);
   useEffect(() => {
     if (!user) {
-      stopSound();
-      setSound(false);
+      previewSound.current = false;
       setOrders([]);
     }
-  }, [user, stopSound]);
+  }, [user]);
   useEffect(
     () => () => {
       stopSound();
@@ -285,27 +328,25 @@ export default function Admin() {
     },
     [stopSound],
   );
-  async function toggleSound() {
+  function toggleSound() {
     if (sound) {
+      previewSound.current = false;
       stopSound();
-      setSound(false);
-      return;
-    }
-    setActivatingSound(true);
-    try {
-      if (!audio.current) {
-        const context = new AudioContext();
-        audio.current = { context, buffer: createOrderAlert(context) };
+    } else {
+      try {
+        prepareSound();
+        previewSound.current = true;
+      } catch {
+        setError('No se pudo activar el sonido en este navegador.');
+        return;
       }
-      const { context } = audio.current;
-      await context.resume();
-      if (context.state !== 'running') throw new Error('El navegador suspendió el sonido.');
-      if (!newCount) playSound(false);
-      setSound(true);
+    }
+    const nextSound = !sound;
+    setSound(nextSound);
+    try {
+      localStorage.setItem(soundPreferenceKey, nextSound ? 'on' : 'off');
     } catch {
-      setError('No se pudo activar el sonido. Volvé a intentar desde este botón.');
-    } finally {
-      setActivatingSound(false);
+      // Keep the preference for this page even if browser storage is blocked.
     }
   }
   const run = async (fn: () => Promise<any>) => {
@@ -442,6 +483,11 @@ export default function Admin() {
         )}
         <main className="admin-content" key={view}>
           <ErrorBox message={error} />
+          {sound && !audioReady && (
+            <div className="notice" role="status">
+              El sonido quedó activado. Hacé clic o tocá la pantalla para habilitar el audio.
+            </div>
+          )}
           {!connected && (
             <div className="notice">
               Conexión en tiempo real interrumpida. Recuperamos los pedidos al reconectar y
@@ -465,7 +511,6 @@ export default function Admin() {
                 </div>
                 <button
                   className={'secondary ' + (sound ? 'sound-on' : '')}
-                  disabled={activatingSound}
                   onClick={toggleSound}
                 >
                   {sound ? <Volume2 size={18} /> : <VolumeX size={18} />}{' '}
