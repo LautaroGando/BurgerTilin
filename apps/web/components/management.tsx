@@ -7,6 +7,47 @@ import ImagePicker from './image-picker';
 import ChannelPrices from './channel-prices';
 import { AccessPanel, AuditPanel } from './access-panel';
 import ArchiveDialog from './archive-dialog';
+
+type RecipeEntry = { ingredientId: string; quantity: number; removable: boolean };
+
+function comboRecipeOverlap(recipe: RecipeEntry[], slots: any[], products: Product[]) {
+  const remaining = new Map<string, number>();
+  for (const item of recipe) {
+    remaining.set(item.ingredientId, (remaining.get(item.ingredientId) ?? 0) + item.quantity);
+  }
+  const groups: string[] = [];
+  const overlap = new Map<string, number>();
+  for (const slot of slots) {
+    const component = products.find((product) => product.id === slot.choices[0]?.productId);
+    const componentRecipe: RecipeEntry[] = component?.config.recipe ?? [];
+    if (!componentRecipe.length || !Number.isInteger(slot.quantity) || slot.quantity < 1) continue;
+
+    const required = new Map<string, number>();
+    for (const item of componentRecipe) {
+      required.set(
+        item.ingredientId,
+        (required.get(item.ingredientId) ?? 0) + item.quantity * slot.quantity,
+      );
+    }
+    if ([...required].some(([id, quantity]) => (remaining.get(id) ?? 0) < quantity)) continue;
+
+    groups.push(slot.name);
+    for (const [id, quantity] of required) {
+      remaining.set(id, remaining.get(id)! - quantity);
+      overlap.set(id, (overlap.get(id) ?? 0) + quantity);
+    }
+  }
+
+  return {
+    groups,
+    recipe: recipe.flatMap((item) => {
+      const quantity = Math.min(item.quantity, overlap.get(item.ingredientId) ?? 0);
+      overlap.set(item.ingredientId, (overlap.get(item.ingredientId) ?? 0) - quantity);
+      return quantity === item.quantity ? [] : [{ ...item, quantity: item.quantity - quantity }];
+    }),
+  };
+}
+
 function RecipeEditor({
   value,
   onChange,
@@ -127,6 +168,7 @@ function ProductEditor({
       key,
       form.config[key].map((x: any, i: number) => (i === index ? { ...x, [k]: v } : x)),
     );
+  const overlap = comboRecipeOverlap(form.config.recipe, form.config.slots, products);
   return (
     <Modal
       wide
@@ -231,9 +273,26 @@ function ProductEditor({
           <>
             <h3>Consumo por unidad</h3>
             <p className="muted small">
-              Usá gramos, mililitros o unidades. Incluí el packaging. Cada variante puede reemplazar
-              esta receta.
+              {form.config.slots.length
+                ? 'Agregá los insumos propios del combo, como el packaging. Las opciones elegidas aportan sus insumos automáticamente.'
+                : 'Usá gramos, mililitros o unidades. Incluí el packaging. Cada variante puede reemplazar esta receta.'}
             </p>
+            {overlap.groups.length > 0 && (
+              <div className="notice">
+                <p>
+                  Revisá {overlap.groups.join(', ')}. Las opciones iniciales de estos grupos ya
+                  aportan insumos que figuran en la receta. Si son los mismos, descontá esas
+                  cantidades de la receta del combo.
+                </p>
+                <button
+                  type="button"
+                  className="secondary small"
+                  onClick={() => config('recipe', overlap.recipe)}
+                >
+                  Descontar cantidades repetidas
+                </button>
+              </div>
+            )}
             <RecipeEditor
               value={form.config.recipe}
               onChange={(v) => config('recipe', v)}
