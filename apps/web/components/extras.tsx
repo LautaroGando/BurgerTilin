@@ -109,8 +109,12 @@ export function RepeatButton({ id }: { id: string }) {
               api('admin/settings'),
             ]);
             setDraft({ ...d, key: crypto.randomUUID() });
-            setMethods(s.methods.filter((m: any) => m.enabled));
-            setMethod(s.methods.find((m: any) => m.enabled)?.id || '');
+            const availableMethods = s.methods.filter(
+              (m: any) =>
+                m.enabled && (d.fulfillment !== 'PLATFORM' || ['cash', 'transfer'].includes(m.id)),
+            );
+            setMethods(availableMethods);
+            setMethod(availableMethods[0]?.id || '');
           } catch (e: any) {
             setError(e.message);
           }
@@ -122,8 +126,8 @@ export function RepeatButton({ id }: { id: string }) {
       {draft && (
         <Modal title="Revisar pedido repetido" close={() => setDraft(null)} dismissRef={dismiss}>
           <p className="muted">
-            Se validan otra vez precio y disponibilidad al confirmar. Revisá dirección y entrega con
-            el cliente.
+            Se validan otra vez precio y disponibilidad al confirmar.
+            {draft.fulfillment !== 'PLATFORM' && ' Revisá dirección y entrega con el cliente.'}
           </p>
           <p className="muted">Canal de la nueva venta: {channelLabel(draft.channel)}</p>
           {draft.quote.items.map((i: any, j: number) => (
@@ -134,12 +138,14 @@ export function RepeatButton({ id }: { id: string }) {
               <b>{money(i.unitPrice * i.quantity)}</b>
             </div>
           ))}
-          <Field label="Dirección de entrega">
-            <input
-              value={draft.address}
-              onChange={(e) => setDraft({ ...draft, address: e.target.value })}
-            />
-          </Field>
+          {draft.fulfillment !== 'PLATFORM' && (
+            <Field label="Dirección de entrega">
+              <input
+                value={draft.address}
+                onChange={(e) => setDraft({ ...draft, address: e.target.value })}
+              />
+            </Field>
+          )}
           <Field label="Medio de pago">
             <select value={method} onChange={(e) => setMethod(e.target.value)}>
               {methods.map((m) => (
@@ -152,11 +158,13 @@ export function RepeatButton({ id }: { id: string }) {
           <ErrorBox message={error} />
           <button
             className="primary full"
-            disabled={busy}
+            disabled={busy || !method}
             onClick={async () => {
               setBusy(true);
               try {
-                await api('admin/orders', { ...draft, method });
+                const endpoint =
+                  draft.fulfillment === 'PLATFORM' ? 'admin/orders/quick-apps-sale' : 'admin/orders';
+                await api(endpoint, { ...draft, method });
                 dismiss.current?.();
               } catch (e: any) {
                 setError(e.message);

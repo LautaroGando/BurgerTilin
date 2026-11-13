@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { Download, Printer, Plus, ArrowUpRight, Wallet, Check, Search, X } from 'lucide-react';
-import { api, money, date, statusNames, channelLabel } from '../lib/api';
+import { api, money, date, statusNames, channelLabel, fulfillmentLabel } from '../lib/api';
 import { Modal, Empty, Field, ErrorBox, Toggle } from './ui';
 import { ImportButton, RepeatButton, Settlements } from './extras';
 import ArchiveDialog from './archive-dialog';
@@ -60,7 +60,7 @@ export function OrderDetail({
       <div className="printable">
         <div className="print-heading">BURGER TILÍN · COMANDA #{o.number}</div>
         <div className="row spread">
-          <b>{o.fulfillment === 'DELIVERY' ? 'Delivery' : 'Retiro'}</b>
+          <b>{fulfillmentLabel(o.fulfillment)}</b>
           <span>{date(o.createdAt)}</span>
           <span className="tag">{statusNames[o.status]}</span>
         </div>
@@ -87,7 +87,7 @@ export function OrderDetail({
         {!kitchen && (
           <>
             <div className="customer-detail">
-              <b>{o.customerName}</b>
+              <b>{o.customerName || 'Sin nombre'}</b>
               <span>{o.phone}</span>
               <span>{o.address}</span>
               {o.address && (
@@ -532,7 +532,7 @@ export function SalesView({ role }: { role: string }) {
                       <b>#{o.number}</b>
                     </td>
                     <td>{date(o.createdAt)}</td>
-                    <td>{o.customerName}</td>
+                    <td>{o.customerName || 'Sin nombre'}</td>
                     <td>{channelLabel(o.channel)}</td>
                     <td>
                       <b>{money(o.total)}</b>

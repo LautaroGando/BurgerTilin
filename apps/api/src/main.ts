@@ -235,6 +235,12 @@ class Api {
   @Post('admin/orders') @Roles(...cash) manual(@Body() body: unknown, @Req() req: AuthRequest) {
     return this.orders.create(body, req.user.id);
   }
+  @Post('admin/orders/quick-apps-sale') @Roles(...cash) quickAppsSale(
+    @Body() body: unknown,
+    @Req() req: AuthRequest,
+  ) {
+    return this.orders.quickAppsSale(body, req.user.id);
+  }
   @Patch('admin/orders/:id/status') @Roles(...staff) status(
     @Param('id') id: string,
     @Body() body: unknown,

@@ -205,6 +205,12 @@ export const orderInput = z.object({
   method: z.string(),
   items: z.array(lineInput).min(1).max(50),
 });
+export const quickAppsSaleInput = orderInput
+  .omit({ channel: true, fulfillment: true, phone: true, address: true, zone: true, notes: true })
+  .extend({
+    name: z.string().trim().max(100).default(''),
+    method: z.enum(['cash', 'transfer']),
+  });
 export const transitions: Record<string, string[]> = {
   NEW: ['ACCEPTED', 'REJECTED', 'CANCELLED'],
   ACCEPTED: ['PREPARING', 'CANCELLED'],

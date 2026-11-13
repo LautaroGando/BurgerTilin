@@ -326,11 +326,13 @@ export function Checkout({
   channel?: string;
   discount?: number;
 }) {
+  const quickAppsSale = manual && channel === 'APPS';
   const methods = (settings.methods as { id: string; name: string; enabled?: boolean }[]).filter(
-    (method) => method.enabled !== false,
+    (method) =>
+      method.enabled !== false && (!quickAppsSale || ['cash', 'transfer'].includes(method.id)),
   );
   const [form, setForm] = useState({
-    name: manual ? 'Cliente' : '',
+    name: manual && !quickAppsSale ? 'Cliente' : '',
     phone: '',
     address: '',
     zone: settings.zones[0]?.id || '',
@@ -340,11 +342,13 @@ export function Checkout({
   });
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  const endpoint = quickAppsSale ? 'admin/orders/quick-apps-sale' : manual ? 'admin/orders' : 'orders';
+  const storageKey = quickAppsSale ? 'tilin-quick-apps-sale-key' : 'tilin-checkout-key';
   const [key] = useState(() => {
-    const saved = sessionStorage.getItem('tilin-checkout-key');
+    const saved = sessionStorage.getItem(storageKey);
     if (saved) return saved;
     const id = crypto.randomUUID();
-    sessionStorage.setItem('tilin-checkout-key', id);
+    sessionStorage.setItem(storageKey, id);
     return id;
   });
   const subtotal = cart.reduce((a, l) => a + l.displayPrice * l.quantity, 0);
@@ -358,15 +362,14 @@ export function Checkout({
     setBusy(true);
     setError('');
     try {
-      const result = await api(manual ? 'admin/orders' : 'orders', {
-        ...form,
+      const result = await api(endpoint, {
+        ...(quickAppsSale ? { name: form.name, method: form.method } : { ...form, channel }),
         key,
-        channel,
         discount: appliedDiscount,
         expectedTotal: total,
         items: cart.map(({ label, displayPrice, ...l }) => l),
       });
-      sessionStorage.removeItem('tilin-checkout-key');
+      sessionStorage.removeItem(storageKey);
       done(result);
     } catch (e: any) {
       setError(e.message);
@@ -377,45 +380,50 @@ export function Checkout({
   return (
     <Modal title={manual ? 'Confirmar venta' : 'Ya casi está tu pedido'} close={close}>
       <form onSubmit={submit}>
-        <div className="segmented">
-          <button
-            type="button"
-            className={form.fulfillment === 'PICKUP' ? 'selected' : ''}
-            onClick={() => change('fulfillment', 'PICKUP')}
-          >
-            <Store size={18} />
-            Retiro
-          </button>
-          <button
-            type="button"
-            className={form.fulfillment === 'DELIVERY' ? 'selected' : ''}
-            onClick={() => change('fulfillment', 'DELIVERY')}
-          >
-            <Truck size={18} />
-            Delivery
-          </button>
-        </div>
-        <Field label="Nombre">
+        {!quickAppsSale && (
+          <div className="segmented">
+            <button
+              type="button"
+              className={form.fulfillment === 'PICKUP' ? 'selected' : ''}
+              onClick={() => change('fulfillment', 'PICKUP')}
+            >
+              <Store size={18} />
+              Retiro
+            </button>
+            <button
+              type="button"
+              className={form.fulfillment === 'DELIVERY' ? 'selected' : ''}
+              onClick={() => change('fulfillment', 'DELIVERY')}
+            >
+              <Truck size={18} />
+              Delivery
+            </button>
+          </div>
+        )}
+        <Field label={quickAppsSale ? 'Nombre (opcional)' : 'Nombre'}>
           <input
             autoComplete="name"
-            required
+            required={!quickAppsSale}
+            maxLength={100}
             value={form.name}
             onChange={(e) => change('name', e.target.value)}
           />
         </Field>
-        <Field
-          label={`Teléfono con código de país y área${manual ? ' (opcional para retiro)' : ''}`}
-        >
-          <input
-            type="tel"
-            autoComplete="tel"
-            required={!manual || form.fulfillment === 'DELIVERY'}
-            value={form.phone}
-            onChange={(e) => change('phone', e.target.value)}
-            placeholder="Ej. +54 …"
-          />
-        </Field>
-        {form.fulfillment === 'DELIVERY' && (
+        {!quickAppsSale && (
+          <Field
+            label={`Teléfono con código de país y área${manual ? ' (opcional para retiro)' : ''}`}
+          >
+            <input
+              type="tel"
+              autoComplete="tel"
+              required={!manual || form.fulfillment === 'DELIVERY'}
+              value={form.phone}
+              onChange={(e) => change('phone', e.target.value)}
+              placeholder="Ej. +54 …"
+            />
+          </Field>
+        )}
+        {!quickAppsSale && form.fulfillment === 'DELIVERY' && (
           <>
             <Field label="Zona de entrega">
               <select required value={form.zone} onChange={(e) => change('zone', e.target.value)}>
@@ -445,7 +453,7 @@ export function Checkout({
             </Field>
           </>
         )}
-        {manual ? (
+        {manual && !quickAppsSale ? (
           <Field label="Medio de pago">
             <select required value={form.method} onChange={(e) => change('method', e.target.value)}>
               {methods.map((method) => (
@@ -492,13 +500,15 @@ export function Checkout({
             Vas a pagar en Mercado Pago. El pedido llega a cocina cuando se acredita el pago.
           </p>
         )}
-        <Field label="Nota del pedido (opcional)">
-          <textarea
-            value={form.notes}
-            onChange={(e) => change('notes', e.target.value)}
-            maxLength={500}
-          />
-        </Field>
+        {!quickAppsSale && (
+          <Field label="Nota del pedido (opcional)">
+            <textarea
+              value={form.notes}
+              onChange={(e) => change('notes', e.target.value)}
+              maxLength={500}
+            />
+          </Field>
+        )}
         <div className="receipt">
           {cart.map((l, i) => (
             <div key={i}>
@@ -521,14 +531,16 @@ export function Checkout({
             </div>
           )}
           <div className="receipt-total">
-            <span>Total estimado</span>
+            <span>{quickAppsSale ? 'Total a cobrar' : 'Total estimado'}</span>
             <b>{money(total)}</b>
           </div>
         </div>
-        <p className="muted small">
-          El servidor verifica el precio y la disponibilidad al confirmar. Demora estimada:{' '}
-          {settings.delay} min.
-        </p>
+        {!quickAppsSale && (
+          <p className="muted small">
+            El servidor verifica el precio y la disponibilidad al confirmar. Demora estimada:{' '}
+            {settings.delay} min.
+          </p>
+        )}
         <ErrorBox message={error} />
         <button className="primary full" disabled={busy || !form.method}>
           {busy

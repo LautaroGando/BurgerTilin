@@ -53,6 +53,12 @@ const channelNames: Record<string, string> = {
   COUNTER: 'Mostrador',
 };
 export const channelLabel = (channel: string) => channelNames[channel] ?? channel;
+const fulfillmentNames: Record<string, string> = {
+  PICKUP: 'Retiro',
+  DELIVERY: 'Delivery',
+  PLATFORM: 'Por app',
+};
+export const fulfillmentLabel = (fulfillment: string) => fulfillmentNames[fulfillment] ?? fulfillment;
 export const emptyConfig = { recipe: [], variants: [], extras: [], slots: [], channelPrices: {} };
 export type Product = {
   id: string;

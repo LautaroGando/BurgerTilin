@@ -31,7 +31,7 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react';
-import { api, money, date, statusNames, channelLabel, Product, CartLine } from '../lib/api';
+import { api, money, date, statusNames, channelLabel, fulfillmentLabel, Product, CartLine } from '../lib/api';
 import { createOrderAlert } from '../lib/order-alert';
 import { currentAdminSubscription, registerAdminWorker } from '../lib/admin-push';
 import { Brand, Modal, Empty, Loading, Field, ErrorBox } from './ui';
@@ -617,7 +617,7 @@ export default function Admin() {
                           <span className={'order-badge ' + o.status}>{statusNames[o.status]}</span>
                         </div>
                         <div className="order-meta">
-                          <b>{o.fulfillment === 'DELIVERY' ? 'Delivery' : 'Retiro'}</b>
+                          <b>{fulfillmentLabel(o.fulfillment)}</b>
                           <span>{date(o.createdAt).split(',').pop()}</span>
                           <span className={age > o.estimatedMinutes ? 'late' : ''}>
                             <Clock size={13} />
@@ -646,7 +646,7 @@ export default function Admin() {
                         {!kitchen && (
                           <div className="order-financial">
                             <span>
-                              {o.customerName}
+                              {o.customerName || 'Sin nombre'}
                               <small>
                                 {channelLabel(o.channel)} · {statusNames[o.paymentStatus]}
                               </small>

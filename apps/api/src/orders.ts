@@ -12,7 +12,15 @@ import { z } from 'zod';
 import { Db } from './db';
 import { Catalog } from './catalog';
 import { hash } from './auth';
-import { activeChannel, opening, orderInput, phoneKey, transitions, integerMoney } from './domain';
+import {
+  activeChannel,
+  opening,
+  orderInput,
+  quickAppsSaleInput,
+  phoneKey,
+  transitions,
+  integerMoney,
+} from './domain';
 import { atomic } from './transactions';
 import { OrderPush, queueOrderAlerts } from './order-push';
 import {
@@ -22,6 +30,9 @@ import {
   reservedPaymentMethod,
 } from './mercado-pago-client';
 export const orderInclude = { payments: true, reservations: true, onlineCheckout: true } as const;
+type OrderInput = Omit<z.infer<typeof orderInput>, 'fulfillment'> & {
+  fulfillment: z.infer<typeof orderInput>['fulfillment'] | 'PLATFORM';
+};
 export const audit = (
   tx: Prisma.TransactionClient,
   actor: string,
@@ -41,7 +52,24 @@ export class Orders {
     this.events.next({ data: JSON.stringify({ refresh: true, at: Date.now() }) });
   }
   async create(raw: unknown, actor?: string) {
-    const input = orderInput.parse(raw);
+    return this.createOrder(orderInput.parse(raw), actor);
+  }
+  async quickAppsSale(raw: unknown, actor: string) {
+    const sale = quickAppsSaleInput.parse(raw);
+    return this.createOrder(
+      {
+        ...sale,
+        channel: 'APPS',
+        fulfillment: 'PLATFORM',
+        phone: '',
+        address: '',
+        zone: '',
+        notes: '',
+      },
+      actor,
+    );
+  }
+  private async createOrder(input: OrderInput, actor?: string) {
     if (!actor && input.channel !== 'WEB') throw new BadRequestException('Canal inválido');
     if (!actor && input.discount) throw new BadRequestException('Descuento no autorizado');
     const requestHash = hash(JSON.stringify(input));
@@ -186,7 +214,7 @@ export class Orders {
     if (!transitions[o.status]?.includes(status))
       throw new BadRequestException('Ese cambio de estado no está permitido');
     if (status === 'DISPATCHED' && o.fulfillment !== 'DELIVERY')
-      throw new BadRequestException('El pedido es para retirar');
+      throw new BadRequestException('El pedido no requiere reparto del local');
     if (status === 'DELIVERED' && o.fulfillment === 'DELIVERY' && o.status !== 'DISPATCHED')
       throw new BadRequestException('Primero marcá el pedido en reparto');
     if (

@@ -846,6 +846,55 @@ test(
       failPush = false;
       await Promise.all([orderPush.deliver(newCashOrder.id), orderPush.deliver(newCashOrder.id)]);
       assert.equal(sent.filter((tag) => tag === 'pedido-' + newCashOrder.number).length, 1);
+
+      const quickSaleUrl = url + '/admin/orders/quick-apps-sale';
+      const saleRequest = {
+        key: randomUUID(),
+        method: 'cash',
+        items: [{ productId: p.id, quantity: 1 }],
+        expectedTotal: 1200,
+      };
+      const quickSale = (body: unknown, authenticated = true) =>
+        fetch(quickSaleUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(authenticated ? { cookie } : {}) },
+          body: JSON.stringify(body),
+        });
+      assert.equal((await quickSale(saleRequest, false)).status, 401);
+      assert.equal((await quickSale({ ...saleRequest, method: 'platform' })).status, 400);
+      const quickResponse = await quickSale(saleRequest);
+      assert.equal(quickResponse.status, 201, await quickResponse.clone().text());
+      const quickResult = await quickResponse.json();
+      assert.equal((await (await quickSale(saleRequest)).json()).id, quickResult.id);
+      const quickOrder = await d.order.findUniqueOrThrow({
+        where: { id: quickResult.id },
+        include: { payments: true },
+      });
+      assert.equal(quickOrder.channel, 'APPS');
+      assert.equal(quickOrder.fulfillment, 'PLATFORM');
+      assert.equal(quickOrder.customerName, '');
+      assert.equal(quickOrder.customerId, null);
+      assert.equal(quickOrder.shipping, 0);
+      assert.equal(quickOrder.payments[0].method, 'cash');
+      assert.equal(quickOrder.payments[0].status, 'PENDING');
+      for (const status of ['ACCEPTED', 'PREPARING', 'READY', 'DELIVERED']) {
+        await o.change(quickOrder.id, status, actor.id);
+      }
+      const transferResponse = await quickSale({
+        ...saleRequest,
+        key: randomUUID(),
+        name: ' Facundo ',
+        method: 'transfer',
+      });
+      assert.equal(transferResponse.status, 201, await transferResponse.clone().text());
+      const transferOrder = await d.order.findUniqueOrThrow({
+        where: { id: (await transferResponse.json()).id },
+        include: { payments: true },
+      });
+      assert.equal(transferOrder.customerName, 'Facundo');
+      assert.equal(transferOrder.payments[0].method, 'transfer');
+      assert.equal(transferOrder.payments[0].status, 'PENDING');
+
       const changePassword = await fetch(url + '/auth/password', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
