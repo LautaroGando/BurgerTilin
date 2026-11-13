@@ -5,7 +5,10 @@ export const metadata: Metadata = {
   title: 'Burger Tilín Admin',
   manifest: '/admin/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'Tilín Admin', statusBarStyle: 'default' },
-  icons: { apple: '/admin-icons/apple.png' },
+  icons: {
+    icon: { url: '/admin-icons/favicon.png', type: 'image/png', sizes: '64x64' },
+    apple: '/admin-icons/apple.png',
+  },
 };
 
 export default function Page() {

@@ -75,7 +75,7 @@ function Login({ done }: { done: (u: any) => void }) {
   return (
     <div className="login-screen">
       <div className="login-art">
-        <Brand />
+        <Brand admin />
         <div>
           <span className="eyebrow">EL EQUIPO DETRÁS DE LA PLANCHA</span>
           <h1>
@@ -334,9 +334,9 @@ export default function Admin() {
   const shown = orders.filter((o) => filter === 'ALL' || o.status === filter);
   return (
     <div className={'admin-shell ' + (mobile ? 'nav-open' : '')}>
-      <aside className="sidebar">
+      <aside className="sidebar" id="admin-sidebar">
         <Link href="/admin">
-          <Brand />
+          <Brand admin />
         </Link>
         <span className="workspace-label">TU LOCAL, EN ORDEN</span>
         <nav>
@@ -395,32 +395,44 @@ export default function Admin() {
       <div className="admin-body">
         <header className="admin-topbar">
           <button
+            type="button"
             className="mobile-menu icon-btn"
-            onClick={() => setMobile(!mobile)}
-            aria-label="Menú"
+            onClick={() => setMobile((open) => !open)}
+            aria-label={mobile ? 'Cerrar menú' : 'Abrir menú'}
+            aria-expanded={mobile}
+            aria-controls="admin-sidebar"
           >
-            <Menu />
+            {mobile ? <X /> : <Menu />}
           </button>
+          <Link href="/admin" className="admin-mobile-brand">
+            <Brand admin />
+          </Link>
           <div className="breadcrumb">
-            MI LOCAL <span>/</span> <b>{navigation.find((n) => n.id === view)?.label}</b>
+            <span className="breadcrumb-home">MI LOCAL</span>
+            <span className="breadcrumb-divider">/</span>
+            <b>{navigation.find((n) => n.id === view)?.label}</b>
           </div>
-          <div className="row">
-            <button type="button" className="icon-btn" title="App y avisos de pedidos" aria-label="App y avisos de pedidos" onClick={() => setAppSettings(true)}>
-              <Bell size={20} />
-            </button>
-            <span className={'connection ' + (connected ? 'online' : 'offline')}>
-              {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
-              {connected ? 'En vivo' : 'Reconectando…'}
-            </span>
-            <span className="top-date">
-              {new Intl.DateTimeFormat('es-AR', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                timeZone: 'America/Argentina/Buenos_Aires',
-              }).format(tick)}
-            </span>
-          </div>
+          <button
+            type="button"
+            className="admin-alerts icon-btn"
+            title="App y avisos de pedidos"
+            aria-label="App y avisos de pedidos"
+            onClick={() => setAppSettings(true)}
+          >
+            <Bell size={20} />
+          </button>
+          <span className={'connection ' + (connected ? 'online' : 'offline')}>
+            {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
+            {connected ? 'En vivo' : 'Reconectando…'}
+          </span>
+          <span className="top-date">
+            {new Intl.DateTimeFormat('es-AR', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+              timeZone: 'America/Argentina/Buenos_Aires',
+            }).format(tick)}
+          </span>
         </header>
         {appSettings && (
           <AdminMobile close={() => setAppSettings(false)} install={installPrompt ? async () => {
@@ -438,7 +450,7 @@ export default function Admin() {
           )}
           {['orders', 'kitchen'].includes(view) ? (
             <>
-              <div className="page-heading">
+              <div className="page-heading orders-heading">
                 <div>
                   <span className="eyebrow orange">A LA PLANCHA</span>
                   <h1>
