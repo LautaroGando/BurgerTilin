@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 export default function DeliveryMapPage() {
   return (
     <main className="delivery-map-page" aria-label="Zona de envío gratis">
-      <DeliveryMap sizes="(max-width: 1045px) calc(100vw - 32px), 1013px" />
+      <DeliveryMap />
     </main>
   );
 }

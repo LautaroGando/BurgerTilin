@@ -768,7 +768,7 @@ export default function Shop() {
               Ampliar mapa <ArrowUpRight size={18} aria-hidden="true" />
             </a>
           </div>
-          <DeliveryMap sizes="(max-width: 720px) calc(100vw - 40px), (max-width: 1200px) 55vw, 650px" />
+          <DeliveryMap />
         </section>
       </main>
       <footer className="shop-footer">

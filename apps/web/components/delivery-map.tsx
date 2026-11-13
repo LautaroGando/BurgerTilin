@@ -1,6 +1,6 @@
 import Image from 'next/image';
 
-export default function DeliveryMap({ sizes }: { sizes: string }) {
+export default function DeliveryMap() {
   return (
     <>
       <svg width="0" height="0" aria-hidden="true" style={{ position: 'absolute' }}>
@@ -20,7 +20,7 @@ export default function DeliveryMap({ sizes }: { sizes: string }) {
         src="/assets/zona-delivery-burger-tilin.png"
         width={1013}
         height={756}
-        sizes={sizes}
+        unoptimized
         alt="Mapa de Burger Tilín con la zona de envío gratis. Incluye partes de Versalles, Monte Castro y Villa Luro."
       />
     </>
