@@ -242,6 +242,15 @@ export class Catalog {
     });
     const ingredients = await this.db.ingredient.findMany({ where: { archivedAt: null } });
     const stock = new Map(ingredients.map((i) => [i.id, i]));
+    const recipeForView = (recipe: ProductConfig['recipe']) =>
+      recipe.flatMap<{ ingredientId: string; name?: string; removable: boolean; quantity?: number }>(
+        (item) => {
+          const name = stock.get(item.ingredientId)?.name;
+          if (!publicView) return [{ ...item, name }];
+          if (!item.removable || !name) return [];
+          return [{ ingredientId: item.ingredientId, name, removable: true }];
+        },
+      );
     const byId = new Map(products.map((p) => [p.id, p]));
     const showCosts = !publicView && includeCosts;
     const online =
@@ -304,30 +313,15 @@ export class Catalog {
         ...p,
         available: available(p),
         ...(baseCost ? { baseCost: { ...baseCost, onlineMargin, appsMargin } } : {}),
-        config: publicView
-          ? {
-              ...c,
-              channelPrices: {},
-              recipe: c.recipe
-                .filter((r) => r.removable)
-                .map((r) => ({
-                  ingredientId: r.ingredientId,
-                  name: stock.get(r.ingredientId)?.name,
-                  removable: true,
-                })),
-              variants: c.variants.map((v) => ({
-                ...v,
-                recipe: v.recipe
-                  .filter((r) => r.removable)
-                  .map((r) => ({
-                    ingredientId: r.ingredientId,
-                    name: stock.get(r.ingredientId)?.name,
-                    removable: true,
-                  })),
-              })),
-              extras: c.extras.map((e) => ({ ...e, recipe: [] })),
-            }
-          : c,
+        config: {
+          ...c,
+          recipe: recipeForView(c.recipe),
+          variants: c.variants.map((v) => ({ ...v, recipe: recipeForView(v.recipe) })),
+          ...(publicView && {
+            channelPrices: {},
+            extras: c.extras.map((e) => ({ ...e, recipe: [] })),
+          }),
+        },
       };
     });
   }

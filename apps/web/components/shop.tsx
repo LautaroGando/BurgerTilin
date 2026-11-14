@@ -98,7 +98,7 @@ function RemovalsEditor({
   selected: string[];
   onChange: (ids: string[]) => void;
 }) {
-  const removable = recipe.filter((ingredient) => ingredient.removable);
+  const removable = recipe.filter((ingredient) => ingredient.removable && ingredient.name?.trim());
   if (!removable.length) return null;
   return (
     <fieldset>
@@ -109,7 +109,7 @@ function RemovalsEditor({
             checked={selected.includes(ingredient.ingredientId)}
             onChange={() => onChange(toggleChoice(selected, ingredient.ingredientId))}
           />
-          Sin {ingredient.name || ingredient.ingredientId}
+          Sin {ingredient.name}
         </label>
       ))}
     </fieldset>

@@ -356,6 +356,23 @@ test(
       });
       assert.equal(login.status, 201);
       const cookie = login.headers.get('set-cookie')!.split(';')[0];
+      const adminProducts = await (
+        await fetch(url + '/admin/products', { headers: { cookie } })
+      ).json();
+      const adminProduct = adminProducts.find((product: { id: string }) => product.id === p.id);
+      assert.deepEqual(adminProduct.config.recipe[0], { ...recipe[0], name: ingredient.name });
+      assert.deepEqual(adminProduct.config.variants[0].recipe[0], {
+        ...recipe[0],
+        quantity: 2,
+        name: ingredient.name,
+      });
+      const publicMenu = await (await fetch(url + '/catalog')).json();
+      const publicCombo = publicMenu.products.find(
+        (product: { id: string }) => product.id === combo.id,
+      );
+      assert.deepEqual(publicCombo.config.recipe, [
+        { ingredientId: removableIngredient.id, name: removableIngredient.name, removable: true },
+      ]);
       const { OrderPush } = await import('../src/order-push');
       const orderPush = app.get(OrderPush);
       const sent: string[] = [];
