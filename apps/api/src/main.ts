@@ -9,6 +9,7 @@ import {
   Headers,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -410,6 +411,12 @@ class Api {
       z.object({ archived: z.boolean() }).parse(b).archived,
       r.user.id,
     );
+  }
+  @Delete('admin/sales/:id') @Roles('OWNER') deleteSale(
+    @Param('id') id: string,
+    @Req() r: AuthRequest,
+  ) {
+    return this.finance.deleteSale(id, r.user.id);
   }
   @Get('admin/performance') @Roles(...cash) performance(@Query() q: unknown) {
     return this.finance.performance(q);

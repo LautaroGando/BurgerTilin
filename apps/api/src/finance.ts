@@ -8,7 +8,7 @@ import {
 import { z } from 'zod';
 import { Db } from './db';
 import { Catalog } from './catalog';
-import { Orders, audit } from './orders';
+import { Orders, audit, deletedSaleAuditId, orderInclude } from './orders';
 import { atomic } from './transactions';
 import { cents, channelLabel, csvCell, TZ } from './domain';
 import { DateTime } from 'luxon';
@@ -371,6 +371,74 @@ export class Finance {
       });
       return { ok: true };
     });
+  }
+
+  async deleteSale(id: string, actor: string) {
+    const result = await atomic(this.db, async (tx) => {
+      const order = await tx.order.findUnique({ where: { id }, include: orderInclude });
+      if (!order) {
+        const deleted = await tx.audit.findFirst({
+          where: { entity: id, action: 'SALE_DELETED' },
+          select: { id: true },
+        });
+        if (deleted) return { ok: true };
+        throw new NotFoundException('No encontramos la venta');
+      }
+      if (!order.archivedAt || !['DELIVERED', 'REJECTED', 'CANCELLED'].includes(order.status))
+        throw new BadRequestException('Archivá la venta finalizada antes de eliminarla.');
+      if (
+        order.paymentStatus !== 'PENDING' ||
+        order.onlineCheckout ||
+        order.payments.some(
+          (payment) =>
+            payment.status === 'CONFIRMED' ||
+            payment.confirmedAt ||
+            payment.settlementId ||
+            payment.shiftId,
+        )
+      ) {
+        throw new BadRequestException(
+          'La venta tiene un cobro registrado o un pago en línea. Revisá el historial de pagos desde el detalle.',
+        );
+      }
+
+      const movements = await tx.stockMovement.findMany({ where: { orderId: id } });
+      const stock = new Map<string, number>();
+      for (const movement of movements)
+        stock.set(movement.ingredientId, (stock.get(movement.ingredientId) ?? 0) - movement.quantity);
+      const reserved = new Map(
+        order.reservations.filter((r) => !r.released).map((r) => [r.ingredientId, r.quantity]),
+      );
+      const ingredientIds = [...new Set([...stock.keys(), ...reserved.keys()])].sort((a, b) =>
+        a.localeCompare(b),
+      );
+      for (const ingredientId of ingredientIds) {
+        await tx.ingredient.update({
+          where: { id: ingredientId },
+          data: {
+            stock: { increment: stock.get(ingredientId) ?? 0 },
+            reserved: { decrement: reserved.get(ingredientId) ?? 0 },
+          },
+        });
+      }
+
+      await tx.stockMovement.deleteMany({ where: { orderId: id } });
+      await tx.reservation.deleteMany({ where: { orderId: id } });
+      await tx.payment.deleteMany({ where: { orderId: id } });
+      await tx.order.delete({ where: { id } });
+      await tx.audit.create({
+        data: {
+          id: deletedSaleAuditId(order.key),
+          action: 'SALE_DELETED',
+          actor,
+          entity: id,
+          data: { number: order.number, total: order.total, stock: [...stock], reserved: [...reserved] },
+        },
+      });
+      return { ok: true };
+    });
+    this.orders.notify();
+    return result;
   }
 
   async performance(raw: unknown) {

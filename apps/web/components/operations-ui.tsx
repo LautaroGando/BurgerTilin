@@ -376,6 +376,7 @@ export function SalesView({ role }: { role: string }) {
     [error, setError] = useState(''),
     [archived, setArchived] = useState(false),
     [archiveTarget, setArchiveTarget] = useState<{ id: string; number: number }>(),
+    [deleteTarget, setDeleteTarget] = useState<{ id: string; number: number }>(),
     [detail, setDetail] = useState<any>();
   const query = new URLSearchParams(
     Object.entries({ ...filters, archived: archived ? 'true' : '' }).filter(([, v]) => v),
@@ -558,6 +559,11 @@ export function SalesView({ role }: { role: string }) {
                               {archived ? 'Restaurar' : 'Archivar'}
                             </button>
                           )}
+                        {role === 'OWNER' && archived && (
+                          <button className="danger-text" onClick={() => setDeleteTarget(o)}>
+                            Eliminar
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -587,6 +593,16 @@ export function SalesView({ role }: { role: string }) {
           path={`admin/sales/${archiveTarget.id}`}
           restore={archived}
           close={() => setArchiveTarget(undefined)}
+          changed={load}
+        />
+      )}
+      {deleteTarget && (
+        <ArchiveDialog
+          name={`pedido #${deleteTarget.number}`}
+          description="Usá esta opción para ventas cargadas por error y sin cobros confirmados. La venta se quitará del registro y de los totales. Los insumos descontados volverán al inventario."
+          path={`admin/sales/${deleteTarget.id}`}
+          remove
+          close={() => setDeleteTarget(undefined)}
           changed={load}
         />
       )}

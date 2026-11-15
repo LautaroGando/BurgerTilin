@@ -8,20 +8,22 @@ export default function ArchiveDialog({
   name,
   description,
   path,
-  restore,
+  restore = false,
+  remove = false,
   close,
   changed,
 }: {
   name: string;
   description: string;
   path: string;
-  restore: boolean;
+  restore?: boolean;
+  remove?: boolean;
   close: () => void;
   changed: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const action = restore ? 'Restaurar' : 'Archivar';
+  const action = remove ? 'Eliminar definitivamente' : restore ? 'Restaurar' : 'Archivar';
 
   return (
     <Modal title={`${action} ${name}`} close={close} dismissible={!busy}>
@@ -39,7 +41,8 @@ export default function ArchiveDialog({
             setBusy(true);
             setError('');
             try {
-              await api(`${path}/archive`, { archived: !restore }, 'PATCH');
+              if (remove) await api(path, undefined, 'DELETE');
+              else await api(`${path}/archive`, { archived: !restore }, 'PATCH');
               changed();
               close();
             } catch (error) {

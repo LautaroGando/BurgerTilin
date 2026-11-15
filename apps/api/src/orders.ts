@@ -30,6 +30,7 @@ import {
   reservedPaymentMethod,
 } from './mercado-pago-client';
 export const orderInclude = { payments: true, reservations: true, onlineCheckout: true } as const;
+export const deletedSaleAuditId = (key: string) => `deleted-sale:${hash(key)}`;
 type OrderInput = Omit<z.infer<typeof orderInput>, 'fulfillment'> & {
   fulfillment: z.infer<typeof orderInput>['fulfillment'] | 'PLATFORM';
 };
@@ -80,6 +81,14 @@ export class Orders {
           throw new ConflictException('La clave ya pertenece a otro pedido');
         return { order: existing, queued: false };
       }
+      const deleted = await tx.audit.findUnique({
+        where: { id: deletedSaleAuditId(input.key) },
+        select: { id: true },
+      });
+      if (deleted)
+        throw new ConflictException(
+          'Esta operación corresponde a una venta eliminada. Iniciá una nueva venta.',
+        );
       const settings = await this.catalog.settings(tx);
       if (!actor && !opening(settings).open)
         throw new BadRequestException('El local no está recibiendo pedidos');

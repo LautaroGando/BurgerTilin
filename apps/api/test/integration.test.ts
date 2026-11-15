@@ -894,9 +894,35 @@ test(
       assert.equal(quickOrder.shipping, 0);
       assert.equal(quickOrder.payments[0].method, 'cash');
       assert.equal(quickOrder.payments[0].status, 'PENDING');
+      const stockBefore = await d.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
       for (const status of ['ACCEPTED', 'PREPARING', 'READY', 'DELIVERED']) {
         await o.change(quickOrder.id, status, actor.id);
       }
+      const deleteSale = (id: string, session?: string) =>
+        fetch(url + `/admin/sales/${id}`, {
+          method: 'DELETE',
+          headers: session ? { cookie: session } : {},
+        });
+      assert.equal((await deleteSale(quickOrder.id)).status, 401);
+      assert.equal((await deleteSale(quickOrder.id, cookie)).status, 400);
+      assert.equal((await archive(`sales/${quickOrder.id}`, true, cookie)).status, 200);
+      assert.equal((await archive(`sales/${sale.id}`, true, cookie)).status, 200);
+      assert.equal((await deleteSale(sale.id, cookie)).status, 400);
+      const totalsBefore = (await f.sales({})).totals;
+      assert.equal((await deleteSale(quickOrder.id, cookie)).status, 200);
+      assert.equal((await deleteSale(quickOrder.id, cookie)).status, 200);
+      assert.equal((await quickSale(saleRequest)).status, 409);
+      const totalsAfter = (await f.sales({})).totals;
+      assert.equal(totalsAfter.orders, totalsBefore.orders - 1);
+      assert.equal(totalsAfter.gross, totalsBefore.gross - quickOrder.total);
+      assert.equal(totalsAfter.collected, totalsBefore.collected);
+      assert.equal(await d.order.findUnique({ where: { id: quickOrder.id } }), null);
+      assert.equal(await d.stockMovement.count({ where: { orderId: quickOrder.id } }), 0);
+      assert.equal(await d.audit.count({ where: { entity: quickOrder.id, action: 'SALE_DELETED' } }), 1);
+      const stockAfter = await d.ingredient.findUniqueOrThrow({ where: { id: ingredient.id } });
+      assert.equal(stockAfter.stock, stockBefore.stock);
+      assert.equal(stockAfter.reserved, stockBefore.reserved - 1);
+
       const transferResponse = await quickSale({
         ...saleRequest,
         key: randomUUID(),
