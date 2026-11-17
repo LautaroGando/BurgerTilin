@@ -432,6 +432,9 @@ class Api {
       orderBy: { name: 'asc' },
     });
   }
+  @Get('admin/customers/lookup') @Roles(...cash) findCustomers(@Query('q') query: unknown) {
+    return this.ops.findCustomers(query);
+  }
   @Get('admin/customers/:id') @Roles(...cash) customer(@Param('id') id: string) {
     return this.ops.customerHistory(id);
   }

@@ -309,6 +309,80 @@ export function Customize({
     </Modal>
   );
 }
+type SavedCustomer = {
+  id: string;
+  name: string;
+  phone: string;
+  delivery: { address: string; zone: string } | null;
+};
+
+function CustomerPicker({ onSelect }: { onSelect: (customer: SavedCustomer) => void }) {
+  const [query, setQuery] = useState('');
+  const [search, setSearch] = useState<{ term: string; customers: SavedCustomer[]; error?: string }>();
+  const term = query.trim();
+
+  useEffect(() => {
+    if (term.length < 2) return;
+    let active = true;
+    const timer = setTimeout(async () => {
+      try {
+        const customers = await api('admin/customers/lookup?' + new URLSearchParams({ q: term }));
+        if (active) setSearch({ term, customers });
+      } catch (error) {
+        if (active) setSearch({ term, customers: [], error: (error as Error).message });
+      }
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [term]);
+
+  const results = search?.term === term ? search : undefined;
+  return (
+    <div className="customer-picker">
+      <Field label="Buscar cliente guardado">
+        <input
+          type="search"
+          autoComplete="off"
+          placeholder="Nombre o teléfono"
+          maxLength={100}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.preventDefault();
+          }}
+        />
+      </Field>
+      {term.length >= 2 && (
+        results?.customers.length ? (
+          <ul>
+            {results.customers.map((customer) => (
+              <li key={customer.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelect(customer);
+                    setQuery('');
+                    setSearch(undefined);
+                  }}
+                >
+                  <b>{customer.name}</b>
+                  <span>{customer.phone}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="small muted" role="status">
+            {results?.error ?? (results ? 'No encontramos clientes con esos datos.' : 'Buscando…')}
+          </p>
+        )
+      )}
+    </div>
+  );
+}
+
 export function Checkout({
   cart,
   settings,
@@ -327,6 +401,8 @@ export function Checkout({
   discount?: number;
 }) {
   const quickAppsSale = manual && channel === 'APPS';
+  const canSelectCustomer = manual && ['WEB', 'WHATSAPP'].includes(channel);
+  const zones = settings.zones as { id: string; name: string; fee: number; minimum: number; enabled: boolean }[];
   const methods = (settings.methods as { id: string; name: string; enabled?: boolean }[]).filter(
     (method) =>
       method.enabled !== false && (!quickAppsSale || ['cash', 'transfer'].includes(method.id)),
@@ -352,11 +428,24 @@ export function Checkout({
     return id;
   });
   const subtotal = cart.reduce((a, l) => a + l.displayPrice * l.quantity, 0);
-  const zone = settings.zones.find((z: any) => z.id === form.zone);
+  const zone = zones.find((z) => z.id === form.zone);
   const shipping = form.fulfillment === 'DELIVERY' ? zone?.fee || 0 : 0;
   const appliedDiscount = manual ? discount : 0;
   const total = subtotal + shipping - appliedDiscount;
   const change = (name: string, value: string) => setForm((f) => ({ ...f, [name]: value }));
+  const selectCustomer = (customer: SavedCustomer) => {
+    const delivery = customer.delivery;
+    const zone = delivery?.zone
+      ? zones.find((zone) => zone.enabled && zone.id === delivery.zone)
+      : zones.find((zone) => zone.enabled);
+    setForm((current) => ({
+      ...current,
+      name: customer.name,
+      phone: customer.phone,
+      address: delivery?.address ?? '',
+      zone: zone?.id ?? '',
+    }));
+  };
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -364,6 +453,7 @@ export function Checkout({
     try {
       const result = await api(endpoint, {
         ...(quickAppsSale ? { name: form.name, method: form.method } : { ...form, channel }),
+        ...(canSelectCustomer && form.fulfillment === 'PICKUP' ? { address: '', zone: '' } : {}),
         key,
         discount: appliedDiscount,
         expectedTotal: total,
@@ -380,6 +470,7 @@ export function Checkout({
   return (
     <Modal title={manual ? 'Confirmar venta' : 'Ya casi está tu pedido'} close={close}>
       <form onSubmit={submit}>
+        {canSelectCustomer && <CustomerPicker onSelect={selectCustomer} />}
         {!quickAppsSale && (
           <div className="segmented">
             <button
@@ -428,9 +519,9 @@ export function Checkout({
             <Field label="Zona de entrega">
               <select required value={form.zone} onChange={(e) => change('zone', e.target.value)}>
                 <option value="">Elegí tu zona</option>
-                {settings.zones
-                  .filter((z: any) => z.enabled)
-                  .map((z: any) => (
+                {zones
+                  .filter((z) => z.enabled)
+                  .map((z) => (
                     <option key={z.id} value={z.id}>
                       {z.name} · {money(z.fee)}
                     </option>

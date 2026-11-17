@@ -571,6 +571,35 @@ legend {
   background: white;
   box-shadow: 0 2px 6px #0001;
 }
+.customer-picker ul {
+  list-style: none;
+  overflow-y: auto;
+  max-height: 12rem;
+  margin: -8px 0 16px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.customer-picker li + li {
+  border-top: 1px solid var(--line);
+}
+.customer-picker li button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.customer-picker li button:is(:hover, :focus-visible) {
+  background: #f3f4ef;
+}
+.customer-picker li span {
+  color: var(--muted);
+}
 .checkout-payment {
   min-width: 0;
   margin: 0 0 17px;

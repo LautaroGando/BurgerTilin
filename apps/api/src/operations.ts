@@ -5,7 +5,7 @@ import { Db } from './db';
 import { Catalog } from './catalog';
 import { Orders, audit } from './orders';
 import { atomic } from './transactions';
-import { cents, productInput, productConfig, salesChannels, settingsInput } from './domain';
+import { cents, phoneKey, productInput, productConfig, salesChannels, settingsInput } from './domain';
 import { passwordHash } from './auth';
 import { reservedPaymentMethod } from './mercado-pago-client';
 @Injectable()
@@ -318,6 +318,41 @@ export class Operations {
       await audit(tx, actor, 'CREATE_USER', u.id, { email: u.email, role: u.role });
       return { id: u.id, email: u.email, role: u.role };
     });
+  }
+  async findCustomers(raw: unknown) {
+    const query = z.string().trim().min(2).max(100).parse(raw);
+    const phone = phoneKey(query);
+    const name = query.replace(/[\\%_]/g, '\\$&');
+    const customers = await this.db.customer.findMany({
+      where: {
+        OR: [
+          { name: { contains: name, mode: 'insensitive' } },
+          ...(phone.length >= 2 ? [{ phone: { contains: phone } }] : []),
+        ],
+      },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      take: 8,
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        orders: {
+          where: {
+            fulfillment: 'DELIVERY',
+            address: { not: '' },
+            status: { notIn: ['CANCELLED', 'REJECTED'] },
+            OR: [{ onlineCheckout: null }, { paymentStatus: { not: 'PENDING' } }],
+          },
+          orderBy: [{ createdAt: 'desc' }, { number: 'desc' }],
+          take: 1,
+          select: { address: true, zone: true },
+        },
+      },
+    });
+    return customers.map(({ orders, ...customer }) => ({
+      ...customer,
+      delivery: orders[0] ?? null,
+    }));
   }
   async customerHistory(id: string) {
     const c = await this.db.customer.findUniqueOrThrow({

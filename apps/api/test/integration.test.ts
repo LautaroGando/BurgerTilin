@@ -938,6 +938,48 @@ test(
       assert.equal(transferOrder.payments[0].method, 'transfer');
       assert.equal(transferOrder.payments[0].status, 'PENDING');
 
+      const savedCustomer = await d.customer.create({
+        data: { name: 'Cliente Frecuente', phone: '5491198765432' },
+      });
+      for (const [minutes, status, fulfillment, address] of [
+        [1, 'DELIVERED', 'DELIVERY', 'Calle de prueba 123'],
+        [2, 'CANCELLED', 'DELIVERY', 'Dirección cancelada 456'],
+        [3, 'DELIVERED', 'PICKUP', 'Dirección de retiro 789'],
+      ] as const) {
+        await d.order.create({
+          data: {
+            key: randomUUID(),
+            requestHash: 'customer-lookup',
+            trackingHash: randomUUID(),
+            trackingSecret: randomUUID(),
+            status,
+            channel: 'WEB',
+            fulfillment,
+            customerId: savedCustomer.id,
+            customerName: savedCustomer.name,
+            phone: savedCustomer.phone,
+            address,
+            zone: 'zona-prueba',
+            items: [],
+            subtotal: 1200,
+            total: 1200,
+            estimatedMinutes: 30,
+            createdAt: new Date(Date.UTC(2024, 0, 1, 0, minutes)),
+          },
+        });
+      }
+      const lookup = url + '/admin/customers/lookup?';
+      assert.equal((await fetch(lookup + 'q=Frecuente')).status, 401);
+      for (const term of ['frecuente', '+54 9 11 9876-5432']) {
+        const response = await fetch(lookup + new URLSearchParams({ q: term }), {
+          headers: { cookie },
+        });
+        assert.equal(response.status, 200);
+        assert.deepEqual(await response.json(), [
+          { ...savedCustomer, delivery: { address: 'Calle de prueba 123', zone: 'zona-prueba' } },
+        ]);
+      }
+
       const changePassword = await fetch(url + '/auth/password', {
         method: 'POST',
         headers: { cookie, 'Content-Type': 'application/json' },
